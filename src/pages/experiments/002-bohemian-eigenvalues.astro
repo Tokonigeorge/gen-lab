@@ -1,0 +1,626 @@
+---
+/**
+ * Experiment 002: Bohemian Eigenvalues
+ * Scatter plot of eigenvalues from all matrices in a Bohemian family,
+ * rendered on the complex plane.
+ */
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>002 — Bohemian Eigenvalues | Generative Lab</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100dvw;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      width: 270px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.3s;
+      overflow: visible;
+    }
+
+    #controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #controls h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-row label {
+      flex-shrink: 0;
+      color: #aaa;
+    }
+
+    .control-row input[type="range"] {
+      flex: 1;
+      accent-color: #6a8cff;
+    }
+
+    .control-row .value {
+      text-align: right;
+      color: #6a8cff;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      min-width: 36px;
+      padding: 4px 12px 4px 8px;
+      margin-right: -21px;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      transform: translateX(0);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .control-row .value.bulge {
+      transform: translateX(12px);
+    }
+
+    .control-row select {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: #ccc;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: rgba(255, 255, 255, 0.12); }
+    .btn.active { background: rgba(106, 140, 255, 0.25); border-color: #6a8cff; color: #6a8cff; }
+
+    #toggle-ui {
+      position: fixed;
+      top: 16px;
+      right: 298px;
+      z-index: 11;
+      background: rgba(10, 10, 15, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: #888;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #toggle-ui:hover { color: #ccc; }
+
+    #back {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11;
+      color: #555;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #back:hover { color: #aaa; }
+
+    #status {
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <a id="back" href="/">← gallery</a>
+  <button id="toggle-ui">UI</button>
+
+  <div id="canvas-container"></div>
+
+  <div id="controls">
+    <h2>002 — Bohemian Eigenvalues</h2>
+
+    <div class="control-row">
+      <label>size</label>
+      <select id="ctrl-size">
+        <option value="2">2×2</option>
+        <option value="3" selected>3×3</option>
+      </select>
+    </div>
+    <div class="control-row">
+      <label>entries</label>
+      <select id="ctrl-entries">
+        <option value="-1,0,1" selected>&#123;-1, 0, 1&#125;</option>
+        <option value="0,1">&#123;0, 1&#125;</option>
+        <option value="-1,1">&#123;-1, 1&#125;</option>
+        <option value="0,1,2">&#123;0, 1, 2&#125;</option>
+        <option value="-2,-1,0,1,2">&#123;-2, -1, 0, 1, 2&#125;</option>
+      </select>
+    </div>
+    <div class="control-row">
+      <label>point size</label>
+      <input type="range" id="ctrl-pointsize" min="0.5" max="3" step="0.25" value="1" />
+      <span class="value" id="val-pointsize">1</span>
+    </div>
+    <div class="control-row">
+      <label>color</label>
+      <select id="ctrl-color">
+        <option value="argument">by argument</option>
+        <option value="modulus">by modulus</option>
+        <option value="single">single color</option>
+      </select>
+    </div>
+    <div class="control-row">
+      <label>distinct only</label>
+      <select id="ctrl-distinct">
+        <option value="false" selected>all eigenvalues</option>
+        <option value="true">distinct only</option>
+      </select>
+    </div>
+
+    <div class="button-row">
+      <button class="btn" id="btn-save">save PNG</button>
+    </div>
+
+    <div id="status">ready</div>
+  </div>
+
+  <script>
+    import { computeAllEigenvalues, computeBatch } from '../../shared/eigen.js';
+    import { saveCanvasPNG } from '../../shared/canvas.js';
+
+    // -----------------------------------------------------------------------
+    // Canvas setup (custom for this experiment — we need precise pixel control)
+    // -----------------------------------------------------------------------
+    const container = document.getElementById('canvas-container');
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    container.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    let W = 0, H = 0, dpr = 1;
+
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      W = container.clientWidth;
+      H = container.clientHeight;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    resize();
+    window.addEventListener('resize', () => { resize(); recompute(); });
+
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    let params = {
+      size: 3,
+      entries: [-1, 0, 1],
+      pointSize: 1,
+      colorMode: 'argument',
+      distinct: false,
+    };
+
+    let eigenvalues = [];
+    let revealAnimId = null; // tracks running reveal animation
+
+    // -----------------------------------------------------------------------
+    // Compute & render
+    // -----------------------------------------------------------------------
+
+    /** Stop any running reveal animation */
+    function cancelReveal() {
+      if (revealAnimId !== null) {
+        cancelAnimationFrame(revealAnimId);
+        revealAnimId = null;
+      }
+    }
+
+    /** Instant compute — used when non-structural controls change (point size, color) */
+    function recompute() {
+      cancelReveal();
+      const status = document.getElementById('status');
+      const totalMatrices = Math.pow(params.entries.length, params.size * params.size);
+      status.textContent = `computing ${totalMatrices.toLocaleString()} matrices…`;
+
+      // Use requestAnimationFrame to let the status text paint before blocking
+      requestAnimationFrame(() => {
+        const t0 = performance.now();
+        eigenvalues = computeAllEigenvalues(params.size, params.entries, params.distinct);
+        const dt = performance.now() - t0;
+        status.textContent = `${eigenvalues.length.toLocaleString()} eigenvalues · ${dt.toFixed(0)}ms`;
+        render();
+      });
+    }
+
+    /**
+     * Reveal animation — plot eigenvalues progressively in batches.
+     *
+     * We target ~300 frames for the full animation (~5 seconds at 60fps).
+     * The batch size is computed dynamically: totalMatrices / 300, clamped
+     * to a minimum of 4 so tiny sets still animate visibly.
+     */
+    function startReveal() {
+      cancelReveal();
+      eigenvalues = [];
+      const status = document.getElementById('status');
+      const totalMatrices = Math.pow(params.entries.length, params.size * params.size);
+      // Target ~300 frames (~5s at 60fps). Clamp so tiny sets still animate.
+      const BATCH_SIZE = Math.max(4, Math.ceil(totalMatrices / 300));
+      let cursor = 0;
+
+      // Pre-compute view bounds from the full dataset so the viewport
+      // stays stable as points appear (no jumping/rescaling mid-animation)
+      const allEigs = computeAllEigenvalues(params.size, params.entries, params.distinct);
+      let maxAbs = 0;
+      for (let i = 0; i < allEigs.length; i++) {
+        const absRe = Math.abs(allEigs[i].re);
+        const absIm = Math.abs(allEigs[i].im);
+        if (absRe > maxAbs) maxAbs = absRe;
+        if (absIm > maxAbs) maxAbs = absIm;
+      }
+      maxAbs = Math.max(maxAbs, 0.5);
+      let maxMod = 0;
+      if (params.colorMode === 'modulus') {
+        for (let i = 0; i < allEigs.length; i++) {
+          const mod = Math.sqrt(allEigs[i].re * allEigs[i].re + allEigs[i].im * allEigs[i].im);
+          if (mod > maxMod) maxMod = mod;
+        }
+        maxMod = Math.max(maxMod, 0.001);
+      }
+
+      // Clear and draw axes once
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, W, H);
+      const padding = 0.85;
+      const fitDim = Math.min(W, H) / 2;
+      const scale = (fitDim * padding) / maxAbs;
+      const cx = W / 2;
+      const cy = H / 2;
+      drawAxes(cx, cy, scale, maxAbs);
+
+      const ps = params.pointSize;
+      const distinct = params.distinct;
+      // When distinct mode is on, track seen eigenvalues to skip duplicates
+      const seen = distinct ? new Set() : null;
+      const PRECISION = 1e6;
+
+      function frame() {
+        const end = Math.min(cursor + BATCH_SIZE, totalMatrices);
+        const batch = computeBatch(params.size, params.entries, cursor, end);
+
+        // Plot this batch
+        for (let i = 0; i < batch.length; i++) {
+          const ev = batch[i];
+
+          // Skip duplicates when distinct mode is active
+          if (distinct) {
+            const key = `${Math.round(ev.re * PRECISION)},${Math.round(ev.im * PRECISION)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+          }
+
+          eigenvalues.push(ev);
+          const px = cx + ev.re * scale;
+          const py = cy - ev.im * scale;
+          if (px < -5 || px > W + 5 || py < -5 || py > H + 5) continue;
+          ctx.fillStyle = getColor(ev, maxMod);
+          ctx.fillRect(px - ps / 2, py - ps / 2, ps, ps);
+        }
+
+        cursor = end;
+        const pct = Math.round((cursor / totalMatrices) * 100);
+        status.textContent = `revealing… ${pct}% · ${eigenvalues.length.toLocaleString()} eigenvalues`;
+
+        if (cursor < totalMatrices) {
+          revealAnimId = requestAnimationFrame(frame);
+        } else {
+          revealAnimId = null;
+          status.textContent = `${eigenvalues.length.toLocaleString()} eigenvalues · revealed`;
+        }
+      }
+
+      revealAnimId = requestAnimationFrame(frame);
+    }
+
+    /**
+     * Render all eigenvalues as a scatter plot on the complex plane.
+     *
+     * The complex plane maps:
+     *   - Real part → x axis (horizontal)
+     *   - Imaginary part → y axis (vertical)
+     *
+     * Each eigenvalue {re, im} becomes a point at pixel coordinates:
+     *   px = centerX + re * scale
+     *   py = centerY - im * scale   (minus because screen y is flipped)
+     *
+     * We auto-fit the scale to show all eigenvalues with some padding.
+     */
+    function render() {
+      // Clear to background
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, W, H);
+
+      if (eigenvalues.length === 0) return;
+
+      // --- Determine the bounding box of all eigenvalues ---
+      let maxAbs = 0;
+      for (let i = 0; i < eigenvalues.length; i++) {
+        const absRe = Math.abs(eigenvalues[i].re);
+        const absIm = Math.abs(eigenvalues[i].im);
+        if (absRe > maxAbs) maxAbs = absRe;
+        if (absIm > maxAbs) maxAbs = absIm;
+      }
+      maxAbs = Math.max(maxAbs, 0.5); // minimum range
+
+      // Scale to fit the smaller screen dimension with padding
+      const padding = 0.85;
+      const fitDim = Math.min(W, H) / 2;
+      const scale = (fitDim * padding) / maxAbs;
+
+      const cx = W / 2;
+      const cy = H / 2;
+
+      // --- Draw axes ---
+      drawAxes(cx, cy, scale, maxAbs);
+
+      // --- Plot each eigenvalue ---
+      const ps = params.pointSize;
+
+      // For modulus coloring: find max modulus for normalization
+      let maxMod = 0;
+      if (params.colorMode === 'modulus') {
+        for (let i = 0; i < eigenvalues.length; i++) {
+          const mod = Math.sqrt(eigenvalues[i].re * eigenvalues[i].re + eigenvalues[i].im * eigenvalues[i].im);
+          if (mod > maxMod) maxMod = mod;
+        }
+        maxMod = Math.max(maxMod, 0.001);
+      }
+
+      for (let i = 0; i < eigenvalues.length; i++) {
+        const ev = eigenvalues[i];
+        const px = cx + ev.re * scale;
+        const py = cy - ev.im * scale;
+
+        // Skip if off-screen
+        if (px < -5 || px > W + 5 || py < -5 || py > H + 5) continue;
+
+        ctx.fillStyle = getColor(ev, maxMod);
+        ctx.fillRect(px - ps / 2, py - ps / 2, ps, ps);
+      }
+    }
+
+    /**
+     * Color an eigenvalue based on the selected mode.
+     *
+     * By argument: the angle of the eigenvalue in the complex plane maps to hue.
+     *   arg(a + bi) = atan2(b, a), range [-π, π] → map to [0°, 360°] on the color wheel.
+     *   This reveals rotational structure in the eigenvalue distribution.
+     *
+     * By modulus: distance from origin maps to brightness.
+     *   |a + bi| = √(a² + b²)
+     *   Eigenvalues near the origin are dark, far ones are bright.
+     *
+     * Single color: uniform soft blue for clean structural visualization.
+     */
+    function getColor(ev, maxMod) {
+      if (params.colorMode === 'argument') {
+        // atan2 gives the angle in radians [-π, π]
+        // Convert to degrees [0, 360] for HSL hue
+        const angle = Math.atan2(ev.im, ev.re);
+        const hue = ((angle / Math.PI) * 180 + 360) % 360;
+        return `hsla(${hue}, 80%, 60%, 0.6)`;
+      }
+
+      if (params.colorMode === 'modulus') {
+        const mod = Math.sqrt(ev.re * ev.re + ev.im * ev.im);
+        const t = Math.min(mod / maxMod, 1);
+        const lightness = 20 + t * 50;
+        return `hsla(220, 70%, ${lightness}%, 0.7)`;
+      }
+
+      // single color
+      return 'rgba(106, 140, 255, 0.5)';
+    }
+
+    /**
+     * Draw the real and imaginary axes with light tick marks and scale labels.
+     */
+    function drawAxes(cx, cy, scale, maxAbs) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.lineWidth = 1;
+
+      // Real axis (horizontal)
+      ctx.beginPath();
+      ctx.moveTo(0, cy);
+      ctx.lineTo(W, cy);
+      ctx.stroke();
+
+      // Imaginary axis (vertical)
+      ctx.beginPath();
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx, H);
+      ctx.stroke();
+
+      // Origin marker
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tick marks and labels
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      // Choose a nice tick interval
+      const rawStep = maxAbs / 3;
+      const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+      const candidates = [1, 2, 5, 10];
+      let step = magnitude;
+      for (const c of candidates) {
+        if (c * magnitude >= rawStep) { step = c * magnitude; break; }
+      }
+
+      // Draw ticks along real axis
+      for (let v = step; v <= maxAbs * 1.1; v += step) {
+        // Positive
+        const px = cx + v * scale;
+        if (px < W - 20) {
+          ctx.fillRect(px, cy - 3, 1, 6);
+          ctx.fillText(formatNum(v), px, cy + 6);
+        }
+        // Negative
+        const nx = cx - v * scale;
+        if (nx > 20) {
+          ctx.fillRect(nx, cy - 3, 1, 6);
+          ctx.fillText(formatNum(-v), nx, cy + 6);
+        }
+      }
+
+      // Draw ticks along imaginary axis
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      for (let v = step; v <= maxAbs * 1.1; v += step) {
+        // Positive imaginary (upward)
+        const py = cy - v * scale;
+        if (py > 20) {
+          ctx.fillRect(cx - 3, py, 6, 1);
+          ctx.fillText(formatNum(v) + 'i', cx + 8, py);
+        }
+        // Negative imaginary (downward)
+        const ny = cy + v * scale;
+        if (ny < H - 20) {
+          ctx.fillRect(cx - 3, ny, 6, 1);
+          ctx.fillText(formatNum(-v) + 'i', cx + 8, ny);
+        }
+      }
+
+      // Axis labels
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText('Re', W - 12, cy + 8);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('Im', cx + 8, 16);
+    }
+
+    function formatNum(n) {
+      if (Number.isInteger(n)) return String(n);
+      return n.toFixed(1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Controls
+    // -----------------------------------------------------------------------
+
+    document.getElementById('ctrl-size').addEventListener('change', (e) => {
+      params.size = parseInt(e.target.value);
+      startReveal();
+    });
+
+    document.getElementById('ctrl-entries').addEventListener('change', (e) => {
+      params.entries = e.target.value.split(',').map(Number);
+      startReveal();
+    });
+
+    const psInput = document.getElementById('ctrl-pointsize');
+    const psDisplay = document.getElementById('val-pointsize');
+    psInput.addEventListener('input', () => {
+      params.pointSize = parseFloat(psInput.value);
+      psDisplay.textContent = params.pointSize;
+      const wide = String(params.pointSize).length >= 4;
+      psDisplay.classList.toggle('bulge', wide);
+      render(); // no recompute needed, just re-render
+    });
+
+    document.getElementById('ctrl-color').addEventListener('change', (e) => {
+      params.colorMode = e.target.value;
+      render();
+    });
+
+    document.getElementById('ctrl-distinct').addEventListener('change', (e) => {
+      params.distinct = e.target.value === 'true';
+      startReveal();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      saveCanvasPNG(canvas, `bohemian-${params.size}x${params.size}-eigenvalues.png`);
+    });
+
+    document.getElementById('toggle-ui').addEventListener('click', () => {
+      document.getElementById('controls').classList.toggle('hidden');
+    });
+
+    // -----------------------------------------------------------------------
+    // Initial reveal — animate the constellation assembling on first load
+    // -----------------------------------------------------------------------
+    startReveal();
+  </script>
+</body>
+</html>

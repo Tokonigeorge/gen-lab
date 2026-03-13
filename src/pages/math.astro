@@ -613,6 +613,153 @@ Particle age → opacity:
     </details>
 
     <!-- ============================================================ -->
+    <!-- EXPERIMENT 002 — BOHEMIAN EIGENVALUES -->
+    <!-- ============================================================ -->
+
+    <h2 style="font-size: 14px; color: #6a8cff; letter-spacing: 0.06em; text-transform: uppercase; margin: 32px 0 16px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06);">Experiment 002: Bohemian Eigenvalues</h2>
+
+    <details>
+      <summary><span class="num">08</span> What Is an Eigenvalue?</summary>
+      <div class="section-body">
+        <h3>The geometric picture</h3>
+        <p>
+          A matrix transforms space — it stretches, rotates, shears, or reflects vectors. Most vectors come out pointing in a completely new direction. But some special vectors only get <strong>scaled</strong> (longer, shorter, or flipped). These are the <strong>eigenvectors</strong>, and the scale factor is the <strong>eigenvalue</strong>.
+        </p>
+        <p>
+          If A·v = λ·v, then v is an eigenvector and λ is its eigenvalue. The matrix does nothing to this direction except scale it by λ.
+        </p>
+
+        <div class="analogy">
+          <strong>Real-world analogy:</strong> Imagine stretching a rubber sheet unevenly. Most arrows drawn on the sheet change direction as the sheet deforms. But some arrows — the ones aligned with the stretch directions — stay pointing the same way, just getting longer or shorter. Those are the eigenvectors. How much they stretch is the eigenvalue.
+        </div>
+
+        <h3>The characteristic polynomial</h3>
+        <p>To find eigenvalues, we solve det(A - λI) = 0. For a 2×2 matrix this gives a quadratic; for 3×3, a cubic. The roots are the eigenvalues.</p>
+
+<pre>
+2×2 matrix:  | a  b |
+             | c  d |
+
+Characteristic equation: λ² - (a+d)·λ + (ad-bc) = 0
+                              ─────        ──────
+                              trace      determinant
+
+Apply the quadratic formula:
+  λ = (trace ± √(trace² - 4·det)) / 2
+</pre>
+
+        <h3>Why eigenvalues can be complex</h3>
+        <p>
+          Consider a 90° rotation matrix: <code>[[0,-1],[1,0]]</code>. No real vector survives this — everything gets turned. There's no real λ. But complex eigenvalues exist: λ = i and λ = -i.
+        </p>
+        <p>
+          Complex eigenvalues encode rotation. And they always come in <strong>conjugate pairs</strong> (a+bi and a-bi) for real matrices — this is why every Bohemian plot is symmetric across the real axis.
+        </p>
+
+        <div class="reading">
+          <strong>Further reading:</strong>
+          <a href="https://www.youtube.com/watch?v=PFDu9oVAE1g">3Blue1Brown, "Eigenvectors and eigenvalues"</a> — the best visual introduction
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">09</span> The Complex Plane</summary>
+      <div class="section-body">
+        <p>
+          The complex plane maps every complex number a + bi to a 2D point: real part → horizontal, imaginary part → vertical.
+        </p>
+
+<pre>
+        Im
+        ↑
+   2i   ·
+        |     ● (1 + 1.5i)
+   1i   ·
+        |
+  ──────┼──────→ Re
+        |
+  -1i   ·
+        |     ● (1 - 1.5i)  ← conjugate pair!
+  -2i   ·
+</pre>
+
+        <p>
+          The <strong>argument</strong> (angle from positive real axis) encodes rotation direction. The <strong>modulus</strong> (distance from origin) encodes scale. In the experiment, "color by argument" maps the angle to a hue on the color wheel, revealing rotational structure in the eigenvalue distribution.
+        </p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">10</span> Bohemian Matrices & Why the Patterns Exist</summary>
+      <div class="section-body">
+        <h3>What "Bohemian" means</h3>
+        <p>
+          <strong>Bo</strong>unded <strong>He</strong>ight <strong>M</strong>atrix of <strong>I</strong>ntegers <strong>an</strong>d their properties. Pick a small set of integers (like {-1, 0, 1}), a matrix size, and enumerate <em>every possible matrix</em>. Compute all eigenvalues and scatter-plot them on the complex plane.
+        </p>
+        <p>
+          For 3×3 with {-1, 0, 1}: 3⁹ = 19,683 matrices × 3 eigenvalues each = 59,049 points. The result isn't noise — it's an intricate fractal-like constellation.
+        </p>
+
+        <h3>Where the structure comes from</h3>
+        <p>The patterns arise from algebraic constraints:</p>
+        <ul>
+          <li>The characteristic polynomial has <strong>integer coefficients</strong> bounded by the entry set</li>
+          <li>Only finitely many distinct polynomials exist → finitely many root configurations</li>
+          <li>Roots of polynomials with small integer coefficients cluster in highly structured ways (this connects to number theory)</li>
+          <li><strong>Real-axis symmetry</strong>: complex roots come in conjugate pairs</li>
+          <li><strong>Void regions</strong>: some areas of the complex plane are algebraically impossible — no polynomial from the family has roots there</li>
+          <li><strong>Fractal boundaries</strong>: the edges where eigenvalue density transitions are infinitely detailed</li>
+        </ul>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Start with 2×2 {0,1} — only 16 matrices, very sparse. Then switch to 3×3 {-1,0,1} and watch the constellation explode into structure. Then try {-2,-1,0,1,2} — the patterns become even denser and more intricate (warning: 5⁹ = ~2M matrices, it takes a moment).
+        </div>
+
+        <div class="reading">
+          <strong>Further reading:</strong>
+          <a href="http://www.bohemianmatrices.com/">bohemianmatrices.com</a> — the definitive gallery and database
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">11</span> Solving the Cubic: Depressed Cubic Method</summary>
+      <div class="section-body">
+        <p>The 3×3 eigenvalue problem requires solving a cubic. The classical approach:</p>
+
+        <h3>Step 1: Get the characteristic polynomial</h3>
+        <p>λ³ - p·λ² + q·λ - r = 0, where p = trace, q = sum of 2×2 cofactors, r = determinant.</p>
+
+        <h3>Step 2: Depress the cubic</h3>
+        <p>Substitute λ = t + p/3 to eliminate the λ² term: t³ + mt + n = 0. This is the "depressed" form — one fewer term to deal with.</p>
+
+        <h3>Step 3: Classify by discriminant</h3>
+<pre>
+Δ = -(4m³ + 27n²)
+
+Δ &gt; 0 → three distinct real roots
+       Use the TRIGONOMETRIC method:
+       t_k = 2√(-m/3) · cos(θ/3 - 2πk/3)
+       for k = 0, 1, 2
+
+Δ &lt; 0 → one real root + two complex conjugates
+       Use CARDANO'S formula:
+       t = ∛(-n/2 + √disc) + ∛(-n/2 - √disc)
+       Then solve the remaining quadratic.
+</pre>
+
+        <div class="analogy">
+          <strong>Why the trigonometric method?</strong> When all three roots are real, Cardano's formula paradoxically involves complex intermediate values (the <em>casus irreducibilis</em>). The trig method avoids this by recognizing that three real roots of a depressed cubic can be expressed as cosines at equally-spaced angles — a beautiful connection between algebra and geometry.
+        </div>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Read through <code>eigen.js</code> — every step of the solver is commented with the mathematical reasoning. Follow along with a specific 3×3 matrix and verify the eigenvalues match.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
     <!-- GLOSSARY -->
     <!-- ============================================================ -->
     <details>
@@ -629,6 +776,11 @@ Particle age → opacity:
           <tr><td><strong>Vector field</strong></td><td>A map that assigns a direction to every point in space</td></tr>
           <tr><td><strong>Curl noise</strong></td><td>Noise field rotated 90° so particles orbit instead of clumping</td></tr>
           <tr><td><strong>Divergence-free</strong></td><td>No pile-ups, no gaps — what flows in must flow out</td></tr>
+          <tr><td><strong>Eigenvalue</strong></td><td>Scale factor λ where A·v = λ·v — the "natural frequencies" of a matrix</td></tr>
+          <tr><td><strong>Characteristic polynomial</strong></td><td>det(A - λI) = 0 — the polynomial whose roots are eigenvalues</td></tr>
+          <tr><td><strong>Complex plane</strong></td><td>2D plane: real part → x, imaginary part → y</td></tr>
+          <tr><td><strong>Bohemian matrix</strong></td><td>Matrix with entries from a fixed finite set of integers</td></tr>
+          <tr><td><strong>Conjugate pair</strong></td><td>a+bi and a-bi — always appear together for real matrices</td></tr>
         </table>
       </div>
     </details>
@@ -646,6 +798,8 @@ Particle age → opacity:
           <li><a href="https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph2007-curlnoise.pdf">Robert Bridson, "Curl-noise for procedural fluid flow"</a> — the original curl noise paper</li>
           <li><a href="https://mrl.cs.nyu.edu/~perlin/paper445.pdf">Ken Perlin, "Improving Noise"</a> — Perlin's own improvements</li>
           <li><a href="https://natureofcode.com/">Daniel Shiffman, The Nature of Code</a> — excellent intro to simulation and noise</li>
+          <li><a href="http://www.bohemianmatrices.com/">bohemianmatrices.com</a> — the definitive Bohemian matrix gallery</li>
+          <li><a href="https://www.youtube.com/watch?v=PFDu9oVAE1g">3Blue1Brown, "Eigenvectors and eigenvalues"</a> — the best visual introduction</li>
         </ul>
       </div>
     </details>
