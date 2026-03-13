@@ -1,0 +1,655 @@
+---
+/**
+ * Math Companion — published version of MATH.md
+ * Collapsible sections for easy reading.
+ */
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Math Companion — Generative Lab</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #d0d0d0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      min-height: 100dvh;
+      padding: 48px 24px 96px;
+      line-height: 1.7;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    a { color: #6a8cff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    #back {
+      display: inline-block;
+      color: #555;
+      font-size: 12px;
+      margin-bottom: 32px;
+    }
+    #back:hover { color: #aaa; }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: #6a8cff;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 40px;
+    }
+
+    /* Collapsible sections */
+    details {
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      transition: background 0.2s;
+    }
+
+    details[open] {
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    summary {
+      padding: 16px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #ccc;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+
+    summary::before {
+      content: '▸';
+      font-size: 12px;
+      color: #555;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+
+    details[open] > summary::before {
+      transform: rotate(90deg);
+    }
+
+    summary .num {
+      color: #6a8cff;
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    .section-body {
+      padding: 0 20px 20px;
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    .section-body h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ccc;
+      margin: 20px 0 8px;
+    }
+
+    .section-body h3:first-child {
+      margin-top: 4px;
+    }
+
+    .section-body p {
+      margin-bottom: 12px;
+    }
+
+    .section-body ul, .section-body ol {
+      margin: 0 0 12px 20px;
+    }
+
+    .section-body li {
+      margin-bottom: 4px;
+    }
+
+    pre {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-size: 12px;
+      line-height: 1.6;
+      margin-bottom: 12px;
+      color: #bbb;
+    }
+
+    code {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .try-it {
+      background: rgba(106, 140, 255, 0.08);
+      border-left: 3px solid #6a8cff;
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+      font-size: 12px;
+      color: #8aa4ff;
+    }
+
+    .analogy {
+      background: rgba(255, 180, 60, 0.08);
+      border-left: 3px solid #e0a030;
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+      font-size: 12px;
+      color: #d4a44a;
+    }
+
+    .reading {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 12px;
+    }
+
+    .reading strong { color: #888; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 12px;
+    }
+
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      color: #888;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a id="back" href="/">← gallery</a>
+
+    <h1>Math Companion</h1>
+    <p class="subtitle">Everything behind Experiment 001: Flow Field. Each section stands alone — open what interests you.</p>
+
+    <!-- ============================================================ -->
+    <!-- 1. GRADIENT NOISE -->
+    <!-- ============================================================ -->
+    <details open>
+      <summary><span class="num">01</span> What Is Gradient Noise?</summary>
+      <div class="section-body">
+        <h3>The problem Perlin was solving</h3>
+        <p>
+          In 1983, Ken Perlin was working on the movie <em>Tron</em> and needed textures that looked natural — marble, wood grain, clouds. The obvious approach (fill each pixel with a random color) produces static — the "untuned TV" look. That's because each pixel is independent of its neighbors. Nature isn't like that: a cloud is bright here, slightly less bright one inch over, even less bright two inches over. Values change <strong>gradually</strong>.
+        </p>
+
+        <p>Perlin needed random numbers that change smoothly. His solution was beautifully simple:</p>
+
+        <h3>The idea: random arrows on a grid</h3>
+        <p>
+          Imagine a sheet of graph paper. At every intersection point, stick a little arrow pointing in a random direction. That arrow is the <strong>gradient vector</strong> — "gradient" just means "direction of change." It doesn't point toward anything special; it's just a random direction, like spinning a compass needle and seeing where it lands.
+        </p>
+
+<pre>
+Imagine each "+" is a grid point with a random arrow:
+
+    +→    +↗    +←    +↓
+
+    +↑    +↘    +→    +↗
+
+    +↙    +←    +↑    +→
+</pre>
+
+        <p>Now, for any point <em>between</em> the grid intersections (that's where the interesting stuff happens), we:</p>
+        <ol>
+          <li><strong>Find the surrounding grid points</strong> — in 2D, that's 4 corners of the cell you're in</li>
+          <li><strong>Measure the offset</strong> — how far are you from each corner? This gives you an offset vector for each corner</li>
+          <li><strong>Dot product</strong> — for each corner, take the dot product of its random arrow with your offset from it. This gives a single number: positive if you're roughly in the direction the arrow points, negative if you're opposite, zero if you're perpendicular</li>
+          <li><strong>Blend smoothly</strong> — interpolate between the four values using a smooth curve (not a straight line, which would create visible creases at grid edges)</li>
+        </ol>
+
+        <div class="analogy">
+          <strong>Real-world analogy:</strong> Imagine four fans at the corners of a room, each pointing a random direction. The airflow you feel at any spot depends on how close you are to each fan and which way it's blowing relative to you. The result: a smooth, swirling air pattern — not random chaos, not a rigid grid. That's gradient noise.
+        </div>
+
+        <div class="try-it">
+          <strong>Try it:</strong> In <code>noise.js</code>, change the gradient table <code>GRAD3</code> to only use axis-aligned vectors like <code>[1,0], [0,1], [-1,0], [0,-1]</code>. You'll see the noise develop a subtle grid-like bias. More gradient directions = more natural-looking results.
+        </div>
+
+        <div class="reading">
+          <strong>Further reading:</strong>
+          <a href="https://mrl.cs.nyu.edu/~perlin/paper445.pdf">Ken Perlin's "Improving Noise" (2002)</a>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- 2. SIMPLEX NOISE -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">02</span> Simplex Noise: Why Triangles Beat Squares</summary>
+      <div class="section-body">
+        <h3>The problem with the square grid</h3>
+        <p>
+          Classic Perlin noise lays out gradient arrows on a <strong>square grid</strong>. To compute noise at any point, you need to check every corner of the square you're inside. In 2D that's 4 corners, but in 3D it's 8 (a cube has 8 corners), in 4D it's 16, and so on — it doubles with each dimension. This gets expensive fast.
+        </p>
+        <p>
+          Plus, squares have a problem: they have very obvious horizontal, vertical, and diagonal axes. No matter how you shuffle the gradients, the noise tends to develop subtle grid-aligned patterns. Your "natural" texture has a faint plaid.
+        </p>
+
+        <h3>What is a simplex?</h3>
+        <p>
+          A <strong>simplex</strong> is the simplest possible shape that can tile (fill) a given space with no gaps. Think of it as the "minimal polygon" for each dimension:
+        </p>
+
+<pre>
+Think of it like this — what's the simplest shape
+you can make from connected dots?
+
+  1D: Connect 2 dots → a line segment  ●———●
+
+  2D: Connect 3 dots → a triangle      ●
+                                       / \
+                                      ●———●
+
+  3D: Connect 4 dots → a tetrahedron     ●
+     (a triangular pyramid)             /|\
+                                       ● | ●
+                                        \|/
+                                         ●
+</pre>
+
+        <p>
+          The key insight: a simplex in N dimensions has only <strong>N + 1</strong> corners. A triangle (2D simplex) has 3 corners, not 4 like a square. A tetrahedron (3D simplex) has 4, not 8 like a cube. That's a huge savings — and it only gets better in higher dimensions.
+        </p>
+
+        <div class="analogy">
+          <strong>Real-world analogy:</strong> Imagine tiling a bathroom floor. You could use square tiles (easy to lay out, but the grid lines are very obvious). Or you could use triangular tiles — they cover the same floor with less material at each junction, and the pattern is harder to spot because triangles don't align to obvious axes. That's the simplex advantage: fewer reference points, fewer artifacts.
+        </div>
+
+        <h3>The skewing trick</h3>
+        <p>
+          Finding which triangle you're inside sounds hard — but there's a clever geometric shortcut. You <strong>skew</strong> (stretch/shear) the coordinate system so that the triangular grid transforms into a square grid. Then finding your cell is trivial: just round down to the nearest integer.
+        </p>
+        <p>
+          Once you know the square cell, you figure out which of the two triangles you're in by checking: is your x-offset greater than your y-offset? If yes, you're in the lower-right triangle. If no, upper-left. Then you unskew back to compute the real distances.
+        </p>
+
+<pre>
+Triangular grid (real space):       After skewing (grid space):
+
+     ●-------●                       ●----●
+    / \     / \       skew →          | ╱ |
+   /   \   /   \      ───→          | ╱  |
+  ●-----●-------●                    ●----●
+   \   / \   /
+    \ /   \ /                       x &gt; y → lower triangle ╱
+     ●-----●                        x &lt; y → upper triangle
+</pre>
+
+        <p>The skew factor in the code (<code>F2 ≈ 0.366</code>) is derived from the geometry: <code>F = (√3 - 1) / 2</code>. This exact value ensures equilateral triangles transform cleanly into squares. It's not arbitrary — it's baked into the geometry of how triangles and squares relate.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> In <code>noise.js</code>, change <code>F2</code> to 0.5 or 0.2. The noise will look "stretched" because the triangles are no longer equilateral — you've broken the symmetry.
+        </div>
+
+        <div class="reading">
+          <strong>Further reading:</strong>
+          <a href="https://weber.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf">Stefan Gustavson, "Simplex noise demystified" (2005)</a> — the clearest walkthrough of the full algorithm
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- 3. OCTAVES / FBM -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">03</span> Octaves: Layering Noise for Realistic Detail</summary>
+      <div class="section-body">
+        <h3>One layer of noise is too simple</h3>
+        <p>
+          A single pass of simplex noise gives you smooth, blobby shapes — like gently rolling hills. But look at a real mountain: it has a broad shape (the overall peak), medium ridges on its slopes, small rocks on those ridges, and tiny grains on those rocks. Detail at <em>every</em> scale.
+        </p>
+        <p>
+          To get that multi-scale detail, we <strong>stack multiple layers of noise</strong>, each one "zoomed in" further. Each layer is called an <strong>octave</strong>.
+        </p>
+
+        <div class="analogy">
+          <strong>Real-world analogy:</strong> Think of audio. A bass guitar plays low, slow vibrations — that's your first octave (broad shapes). A rhythm guitar adds faster vibrations on top — second octave (medium detail). A shaker adds rapid, quiet clicks — third octave (fine texture). Play them together and you get a rich, complex sound. Fractal noise works the same way but with shapes instead of sound.
+        </div>
+
+<pre>
+Octave 0 (frequency ×1, amplitude ×1):
+  Big, slow waves — the overall shape
+  ∿        ∿        ∿        ∿
+
+Octave 1 (frequency ×2, amplitude ×0.5):
+  Twice as frequent, half as tall
+  ∿  ∿  ∿  ∿  ∿  ∿  ∿  ∿
+
+Octave 2 (frequency ×4, amplitude ×0.25):
+  Four times as frequent, quarter height
+  ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿
+
+Sum of all three:
+  ≈ a natural-looking, detailed landscape
+  ∿⌇∿̃∿⌇∿̃∿⌇∿̃∿⌇∿̃
+</pre>
+
+        <p>In the code, this is the <code>fractal2D</code> function. Each iteration of the loop is one octave:</p>
+
+<pre>
+for each octave:
+    value += amplitude × noise(x × frequency, y × frequency)
+    frequency *= 2      ← "zoom in" for next layer
+    amplitude *= 0.5    ← "quiet down" for next layer
+</pre>
+
+        <p>Why "octave"? In music, going up one octave means doubling the frequency. Same here: each noise layer has double the frequency of the previous one.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> In the experiment, set the noise scale slider very low. You'll see the broad, smooth shapes of octave 0. Increase it and the finer octaves become visible as turbulence in the flow.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- 4. LACUNARITY & PERSISTENCE -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">04</span> Lacunarity & Persistence: Tuning the Texture</summary>
+      <div class="section-body">
+        <h3>Lacunarity — how quickly we zoom in</h3>
+        <p>
+          The word comes from Latin <em>lacuna</em>, meaning "gap." Lacunarity controls the <strong>frequency multiplier</strong> between octaves — how big the "gap" is between each zoom level.
+        </p>
+
+<pre>
+lacunarity = 2.0 (default — standard doubling):
+  Octave 0: frequency ×1
+  Octave 1: frequency ×2
+  Octave 2: frequency ×4
+  Octave 3: frequency ×8
+  → Evenly spaced zoom levels, natural-looking detail
+
+lacunarity = 3.0 (aggressive zoom):
+  Octave 0: frequency ×1
+  Octave 1: frequency ×3
+  Octave 2: frequency ×9
+  Octave 3: frequency ×27
+  → Jumps to very fine detail fast, skips medium scales
+
+lacunarity = 1.5 (gentle zoom):
+  Octave 0: frequency ×1
+  Octave 1: frequency ×1.5
+  Octave 2: frequency ×2.25
+  → Octaves stay close in scale, subtle buildup of detail
+</pre>
+
+        <div class="analogy">
+          <strong>Real-world analogy:</strong> Lacunarity is like choosing zoom levels on a map. Default (2.0) is like going: country → state → city → neighborhood. High lacunarity (3.0) is like: country → city → block — you skip scales. Low lacunarity (1.5) is like: country → region → state → county — each step is small.
+        </div>
+
+        <h3>Persistence — how loud each layer is</h3>
+        <p>
+          Persistence (also called "gain") controls how much each successive octave <strong>contributes</strong> to the final result. It's the amplitude multiplier.
+        </p>
+
+<pre>
+persistence = 0.5 (default):
+  Octave 0: amplitude 1.0    ████████████████
+  Octave 1: amplitude 0.5    ████████
+  Octave 2: amplitude 0.25   ████
+  Octave 3: amplitude 0.125  ██
+  → Fine detail fades away quickly → SMOOTH result
+
+persistence = 0.8 (high — rough):
+  Octave 0: amplitude 1.0    ████████████████
+  Octave 1: amplitude 0.8    █████████████
+  Octave 2: amplitude 0.64   ██████████
+  Octave 3: amplitude 0.512  ████████
+  → Fine detail is almost as loud as coarse → ROUGH, craggy
+
+persistence = 0.25 (low — very smooth):
+  Octave 0: amplitude 1.0    ████████████████
+  Octave 1: amplitude 0.25   ████
+  Octave 2: amplitude 0.06   █
+  Octave 3: amplitude 0.015  (barely visible)
+  → Only the big shapes matter → VERY SMOOTH
+</pre>
+
+        <div class="analogy">
+          <strong>Real-world analogy:</strong> Back to the band: persistence is each instrument's volume. High persistence = every instrument is almost equally loud = a wall of sound (complex, rough). Low persistence = the bass dominates, higher instruments are whisper-quiet = a smooth, simple sound.
+        </div>
+
+        <div class="try-it">
+          <strong>Try it:</strong> You can modify the <code>fractal2D</code> call in the experiment. Change the 4th argument (lacunarity) and 5th argument (persistence). Try persistence = 0.8 with speed = 1 — the flow becomes turbulent. Then try persistence = 0.2 — smooth, laminar rivers.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- 5. VECTOR FIELDS -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">05</span> Vector Fields: From Noise to Direction</summary>
+      <div class="section-body">
+        <h3>What is a vector field?</h3>
+        <p>
+          A vector field is just a rule that says: <strong>"at this point in space, the direction is ____."</strong> Think of a weather map showing wind direction at every location. At each point there's an arrow: the wind blows this way, this fast.
+        </p>
+
+<pre>
+A vector field — an arrow at every point:
+
+  ↗  →  →  ↘  ↓
+  ↑  ↗  →  →  ↘
+  ↑  ↑  ↗  →  ↓
+  ↑  ↑  ↑  ↘  ↓
+  ↗  ↑  ↑  ↓  ↙
+
+Drop a leaf in this "wind" and it follows
+the arrows — that's what our particles do.
+</pre>
+
+        <h3>Noise → angle → direction (3 steps)</h3>
+        <p>Our noise function gives us a <strong>number</strong> at each point (like a temperature map: -1 is cold, +1 is hot). But we need a <strong>direction</strong>. Here's the conversion:</p>
+
+<pre>
+Step 1: Get a noise value
+  noise(x, y) → 0.35   (a number between -1 and 1)
+
+Step 2: Convert to an angle
+  angle = 0.35 × 2π = 2.2 radians ≈ 126°
+
+  Why 2π? Because 2π radians = 360° = a full circle.
+  This maps the full noise range [-1, 1] to all
+  possible directions.
+
+Step 3: Convert angle to a direction vector
+  vx = cos(126°) = -0.59  (leftward)
+  vy = sin(126°) =  0.81  (upward)
+
+  So a particle at this point moves up-and-left.
+</pre>
+
+        <p>Because noise is <em>smooth</em> (nearby points have similar values), nearby points get similar angles, which means similar directions. The result: particles flow in coherent streams, not random jitter.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Imagine changing the multiplier from <code>2π</code> to <code>π</code> in the code. Now angles only range from -180° to 180° — all particles drift roughly rightward. The flow becomes biased. The full <code>2π</code> ensures every direction is equally possible.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- 6. CURL NOISE -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">06</span> Curl Noise: Divergence-Free Vortices</summary>
+      <div class="section-body">
+        <h3>The problem: particles clump up</h3>
+        <p>
+          With a regular noise vector field, some areas act as <strong>sinks</strong> (flow converges inward — particles pile up) and <strong>sources</strong> (flow diverges outward — particles flee). Over time, you get unnatural clumps and empty spots.
+        </p>
+
+        <h3>The fix: follow the contour lines</h3>
+        <p>
+          Think of the noise field as a landscape of hills and valleys. The <strong>gradient</strong> at any point is the "steepest uphill" direction — like a ball rolling uphill. If particles followed the gradient, they'd all pile up at the hilltops.
+        </p>
+        <p>
+          <strong>Curl noise rotates the gradient by 90°.</strong> Instead of going uphill, particles walk along the hillside — following the <strong>contour lines</strong> (the lines of equal elevation on a topographic map). No particle ever goes uphill or downhill, so they never pile up or spread out. The flow is <strong>divergence-free</strong>.
+        </p>
+
+        <div class="analogy">
+          <strong>Real-world analogy:</strong> Imagine water on a smooth hillside. Gravity pulls it downhill (that's the gradient). But if the water had no friction and couldn't speed up, it would flow along the hillside at constant elevation — following the contour lines. That's curl noise. And around a hilltop, the contour lines form a loop — so particles orbit the peak in a vortex!
+        </div>
+
+<pre>
+Noise landscape (bird's eye view, numbers = height):
+
+      0.2   0.5   0.8
+      0.3   0.9   0.7     ← "hilltop" at 0.9
+      0.1   0.4   0.3
+
+Gradient at center: points toward 0.9 (uphill)
+      → ↑ (uphill)
+
+Curl (rotate 90°): follows contour around the hill
+      → ← (circles the hilltop!)
+</pre>
+
+        <h3>The math in 4 lines</h3>
+<pre>
+1. Compute gradient (how fast noise changes in x and y):
+   ∂n/∂x ≈ (noise(x+tiny, y) - noise(x-tiny, y)) / (2 × tiny)
+   ∂n/∂y ≈ (noise(x, y+tiny) - noise(x, y-tiny)) / (2 × tiny)
+
+2. Rotate 90° to get curl:
+   curl_x =  ∂n/∂y       (y-change becomes x-direction)
+   curl_y = -∂n/∂x       (negated x-change becomes y-direction)
+</pre>
+
+        <p>That's it. The 90° rotation is what makes the magic — it turns a "flow toward hilltops" field into a "flow around hilltops" field.</p>
+
+        <p>The <code>curl</code> slider in the experiment blends between the regular field (curl = 0) and pure curl noise (curl = 1). At intermediate values, you get a mix of streaming flow and vortices.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Set curl to 1.0 and reduce particles to 500. Watch individual particles orbit the noise peaks in tight loops. Then set curl to 0 — particles stream in rivers and clump at convergence points. The difference is dramatic.
+        </div>
+
+        <div class="reading">
+          <strong>Further reading:</strong>
+          <a href="https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph2007-curlnoise.pdf">Robert Bridson, "Curl-noise for procedural fluid flow" (SIGGRAPH 2007)</a>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- 7. ALPHA DECAY & INK MODE -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">07</span> Alpha Decay & Ink Mode</summary>
+      <div class="section-body">
+        <h3>Why particles fade</h3>
+        <p>
+          Two things create the trailing effect:
+        </p>
+        <ol>
+          <li><strong>Frame fade:</strong> Each frame, a nearly-transparent dark rectangle is drawn over the entire canvas. This slowly dims everything. After ~25 frames, old strokes are faint. After ~50, essentially gone.</li>
+          <li><strong>Particle age:</strong> Each particle has a lifespan. As it ages, its opacity decreases linearly from 1 (fully visible) to 0 (invisible), at which point it "dies" and respawns at a random location.</li>
+        </ol>
+
+<pre>
+Particle age → opacity:
+
+  Born:    ●●●●● (alpha = 1.0, fully opaque)
+  Young:   ●●●○○ (alpha = 0.67)
+  Old:     ●○○○○ (alpha = 0.33, fading)
+  Dead:    ○○○○○ (alpha = 0, respawns elsewhere)
+</pre>
+
+        <p>Together, these create a natural-looking dissipation — like smoke dispersing or ink drying.</p>
+
+        <h3>Ink mode: what it removes</h3>
+        <p>
+          Ink mode simply <strong>removes the frame fade layer</strong>. Nothing gets erased. Every stroke persists forever, accumulating like ink on paper. Over minutes, the complete structure of the flow field becomes visible — every stream, every vortex, every convergence point is rendered as dense overlapping strokes.
+        </p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Enable ink mode, choose the "ink" palette, and let it run for 60 seconds. The result looks like a hand-drawn map of invisible currents.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- GLOSSARY -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">REF</span> Glossary</summary>
+      <div class="section-body">
+        <table>
+          <tr><th>Term</th><th>Plain English</th></tr>
+          <tr><td><strong>Gradient noise</strong></td><td>Smooth randomness built from random arrows at grid points</td></tr>
+          <tr><td><strong>Simplex</strong></td><td>The simplest shape for tiling a space (triangle in 2D)</td></tr>
+          <tr><td><strong>fBm</strong></td><td>Fractal Brownian Motion — stacking noise layers for multi-scale detail</td></tr>
+          <tr><td><strong>Octave</strong></td><td>One layer of noise in the stack, like one instrument in a band</td></tr>
+          <tr><td><strong>Lacunarity</strong></td><td>How quickly we zoom in between octaves (default: 2× each time)</td></tr>
+          <tr><td><strong>Persistence</strong></td><td>How loud each successive octave is (default: half as loud)</td></tr>
+          <tr><td><strong>Vector field</strong></td><td>A map that assigns a direction to every point in space</td></tr>
+          <tr><td><strong>Curl noise</strong></td><td>Noise field rotated 90° so particles orbit instead of clumping</td></tr>
+          <tr><td><strong>Divergence-free</strong></td><td>No pile-ups, no gaps — what flows in must flow out</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
+    <!-- FURTHER READING -->
+    <!-- ============================================================ -->
+    <details>
+      <summary><span class="num">++</span> Further Reading</summary>
+      <div class="section-body">
+        <ul>
+          <li><a href="https://weber.itn.liu.se/~stegu/simplexnoise/simplexnoise.pdf">Stefan Gustavson, "Simplex noise demystified"</a> — the clearest technical reference</li>
+          <li><a href="https://iquilezles.org/articles/">Inigo Quilez, articles on noise and SDF</a> — deep dives on every procedural technique</li>
+          <li><a href="https://tylerxhobbs.com/essays/2020/flow-fields">Tyler Hobbs, "Flow Fields"</a> — practical guide from a generative artist</li>
+          <li><a href="https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph2007-curlnoise.pdf">Robert Bridson, "Curl-noise for procedural fluid flow"</a> — the original curl noise paper</li>
+          <li><a href="https://mrl.cs.nyu.edu/~perlin/paper445.pdf">Ken Perlin, "Improving Noise"</a> — Perlin's own improvements</li>
+          <li><a href="https://natureofcode.com/">Daniel Shiffman, The Nature of Code</a> — excellent intro to simulation and noise</li>
+        </ul>
+      </div>
+    </details>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,523 @@
+---
+/**
+ * Experiment 001: Flow Field
+ * A particle system driven by simplex noise, with optional curl noise for vortices.
+ */
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>001 — Flow Field | Generative Lab</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100dvw;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* --- Controls panel --- */
+    #controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      width: 260px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.3s;
+      overflow: visible;
+    }
+
+    #controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #controls h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-row label {
+      flex-shrink: 0;
+      color: #aaa;
+    }
+
+    .control-row input[type="range"] {
+      flex: 1;
+      accent-color: #6a8cff;
+    }
+
+    .control-row .value {
+      text-align: right;
+      color: #6a8cff;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      min-width: 36px;
+      padding: 4px 12px 4px 8px;
+      /* Push into and past the panel's right edge so it looks like the
+         container wall is bulging outward at exactly this row */
+      margin-right: -21px;        /* flush with the panel's border */
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      /* Animate the bulge: translateX pushes it out past the panel */
+      transform: translateX(0);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .control-row .value.bulge {
+      transform: translateX(12px);
+    }
+
+    .control-row select {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: #ccc;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: rgba(255, 255, 255, 0.12); }
+    .btn.active { background: rgba(106, 140, 255, 0.25); border-color: #6a8cff; color: #6a8cff; }
+
+    #toggle-ui {
+      position: fixed;
+      top: 16px;
+      right: 288px;
+      z-index: 11;
+      background: rgba(10, 10, 15, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: #888;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #toggle-ui:hover { color: #ccc; }
+
+    /* Back link */
+    #back {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11;
+      color: #555;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #back:hover { color: #aaa; }
+  </style>
+</head>
+<body>
+  <a id="back" href="/">← gallery</a>
+  <button id="toggle-ui">UI</button>
+
+  <div id="canvas-container"></div>
+
+  <div id="controls">
+    <h2>001 — Flow Field</h2>
+
+    <div class="control-row">
+      <label>scale</label>
+      <input type="range" id="ctrl-scale" min="0.001" max="0.02" step="0.0005" value="0.004" />
+      <span class="value" id="val-scale">0.004</span>
+    </div>
+    <div class="control-row">
+      <label>particles</label>
+      <input type="range" id="ctrl-count" min="200" max="10000" step="100" value="3000" />
+      <span class="value" id="val-count">3000</span>
+    </div>
+    <div class="control-row">
+      <label>speed</label>
+      <input type="range" id="ctrl-speed" min="0.5" max="6" step="0.25" value="2" />
+      <span class="value" id="val-speed">2</span>
+    </div>
+    <div class="control-row">
+      <label>life</label>
+      <input type="range" id="ctrl-life" min="20" max="500" step="10" value="150" />
+      <span class="value" id="val-life">150</span>
+    </div>
+    <div class="control-row">
+      <label>curl</label>
+      <input type="range" id="ctrl-curl" min="0" max="1" step="0.05" value="0" />
+      <span class="value" id="val-curl">0</span>
+    </div>
+    <div class="control-row">
+      <label>palette</label>
+      <select id="ctrl-palette">
+        <option value="spectrum">spectrum</option>
+        <option value="ink">ink</option>
+        <option value="warm">warm</option>
+        <option value="cold">cold</option>
+        <option value="rust">rust</option>
+        <option value="neon">neon</option>
+      </select>
+    </div>
+
+    <div class="button-row">
+      <button class="btn" id="btn-ink">ink mode</button>
+      <button class="btn" id="btn-pause">pause</button>
+      <button class="btn" id="btn-clear">clear</button>
+      <button class="btn" id="btn-seed">new seed</button>
+      <button class="btn" id="btn-save">save PNG</button>
+    </div>
+  </div>
+
+  <script>
+    import { seed as noiseSeed, simplex2D, fractal2D } from '../../shared/noise.js';
+    import { getPalette } from '../../shared/colors.js';
+    import { createFullscreenCanvas, saveCanvasPNG } from '../../shared/canvas.js';
+
+    // -----------------------------------------------------------------------
+    // Setup
+    // -----------------------------------------------------------------------
+    const container = document.getElementById('canvas-container');
+    const { canvas, ctx, width, height, resize } = createFullscreenCanvas(container);
+
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    let params = {
+      scale: 0.004,
+      count: 3000,
+      speed: 2,
+      life: 150,
+      curl: 0,
+      paletteName: 'spectrum',
+      inkMode: false,
+      paused: false,
+    };
+
+    let currentSeed = Math.floor(Math.random() * 2147483647);
+    noiseSeed(currentSeed);
+
+    let palette = getPalette(params.paletteName);
+    let particles = [];
+
+    // -----------------------------------------------------------------------
+    // Particles
+    // -----------------------------------------------------------------------
+    function createParticle() {
+      return {
+        x: Math.random() * width(),
+        y: Math.random() * height(),
+        age: 0,
+        maxAge: params.life * (0.5 + Math.random()),
+      };
+    }
+
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < params.count; i++) {
+        particles.push(createParticle());
+      }
+    }
+
+    initParticles();
+
+    /**
+     * WHAT IS A VECTOR FIELD?
+     * =======================
+     * A vector field assigns a direction (and magnitude) to every point in
+     * space. Think of it like a weather map showing wind direction at every
+     * location. In our case, the noise function gives us a *scalar* value
+     * at each (x, y) point, and we convert that to a direction.
+     *
+     * FROM NOISE VALUE → ANGLE → DIRECTION VECTOR
+     * =============================================
+     * 1. Sample noise at (x, y) → get a scalar value in [-1, 1]
+     * 2. Multiply by 2π to convert that scalar to an angle in [0, 2π]
+     *    (a full rotation, so every direction is reachable)
+     * 3. Convert the angle to a unit direction vector:
+     *    vx = cos(angle), vy = sin(angle)
+     *
+     * This gives us a smooth, continuous vector field because simplex noise
+     * is smooth — nearby points get similar noise values, therefore similar
+     * angles, therefore similar directions. The result: particles flow in
+     * coherent streams rather than jittering randomly.
+     */
+    function getFieldAngle(x, y) {
+      // Fractal noise → richer, more natural-looking flow patterns
+      const n = fractal2D(x * params.scale, y * params.scale, 4, 2.0, 0.5);
+      return n * Math.PI * 2;
+    }
+
+    /**
+     * WHAT IS CURL NOISE?
+     * ====================
+     * Regular noise fields can converge — particles pile up where flow lines
+     * meet, creating unnatural clumps. Curl noise fixes this by producing a
+     * *divergence-free* field: particles neither bunch up nor spread out.
+     *
+     * The math:
+     *   1. Compute the *gradient* of the scalar noise field at (x, y):
+     *        ∂n/∂x ≈ (noise(x+ε, y) - noise(x-ε, y)) / (2ε)
+     *        ∂n/∂y ≈ (noise(x, y+ε) - noise(x, y-ε)) / (2ε)
+     *
+     *      The gradient points in the direction of steepest increase — think
+     *      of it as "uphill" on the noise landscape.
+     *
+     *   2. Rotate the gradient 90° to get the curl:
+     *        curl_x = ∂n/∂y    (the y-derivative becomes the x-component)
+     *        curl_y = -∂n/∂x   (the negated x-derivative becomes the y-component)
+     *
+     *      This 90° rotation is key: it makes the flow follow the *contour
+     *      lines* of the noise (like water flowing along a hillside, not
+     *      downhill). Contour-following flow is inherently divergence-free —
+     *      nothing is created or destroyed — which is why curl noise produces
+     *      tight, beautiful vortices instead of sinks and sources.
+     *
+     * The `curl` parameter blends between the regular flow field and the
+     * curl field: angle = (1 - curl) * regular + curl * curlAngle.
+     */
+    function getCurlAngle(x, y) {
+      const eps = 1.0; // small offset for numerical gradient
+      const sx = x * params.scale;
+      const sy = y * params.scale;
+
+      // Approximate partial derivatives of the noise field
+      const dndx = (fractal2D((x + eps) * params.scale, sy, 4) -
+                    fractal2D((x - eps) * params.scale, sy, 4)) / (2 * eps);
+      const dndy = (fractal2D(sx, (y + eps) * params.scale, 4) -
+                    fractal2D(sx, (y - eps) * params.scale, 4)) / (2 * eps);
+
+      // Rotate gradient 90°: curl = (∂n/∂y, -∂n/∂x)
+      return Math.atan2(-dndx, dndy);
+    }
+
+    // -----------------------------------------------------------------------
+    // Render loop
+    // -----------------------------------------------------------------------
+
+    /**
+     * WHY PARTICLES FADE (ALPHA DECAY)
+     * =================================
+     * Each particle has a limited lifespan (`maxAge`). As it ages, its opacity
+     * fades from full to zero using: alpha = 1 - (age / maxAge).
+     *
+     * This creates a natural "tail" effect — new strokes are bright, old ones
+     * fade away. It mimics ink diffusing into paper or smoke dissipating.
+     *
+     * When a particle dies (age >= maxAge), it respawns at a random position,
+     * keeping the field continuously populated.
+     *
+     * INK MODE: what it removes
+     * -------------------------
+     * Normally, each frame draws a semi-transparent dark rectangle over the
+     * entire canvas. This slowly erases old strokes, creating flowing trails.
+     *
+     * "Ink mode" removes this fade-out layer entirely. Every stroke persists
+     * forever, building up like ink on paper. The result is a dense, detailed
+     * print that reveals the full structure of the flow field over time.
+     */
+    function draw() {
+      if (params.paused) {
+        animId = requestAnimationFrame(draw);
+        return;
+      }
+
+      const w = width();
+      const h = height();
+
+      // Fade layer: semi-transparent bg rectangle to create trailing effect
+      // In ink mode, we skip this so strokes accumulate permanently
+      if (!params.inkMode) {
+        ctx.fillStyle = 'rgba(10, 10, 15, 0.04)';
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        // Age-based alpha: fade from 1 → 0 over the particle's lifetime
+        const lifeRatio = p.age / p.maxAge;
+        const alpha = 1 - lifeRatio;
+
+        if (alpha <= 0 || p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+          // Respawn dead or out-of-bounds particles
+          particles[i] = createParticle();
+          continue;
+        }
+
+        // Get direction from the vector field
+        let angle = getFieldAngle(p.x, p.y);
+
+        // Blend in curl noise if enabled
+        if (params.curl > 0) {
+          const curlAngle = getCurlAngle(p.x, p.y);
+          angle = angle * (1 - params.curl) + curlAngle * params.curl;
+        }
+
+        // Convert angle → direction vector and move
+        const vx = Math.cos(angle) * params.speed;
+        const vy = Math.sin(angle) * params.speed;
+
+        const prevX = p.x;
+        const prevY = p.y;
+        p.x += vx;
+        p.y += vy;
+        p.age++;
+
+        // Draw a short line segment from old position to new
+        const color = palette(lifeRatio);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 0.8;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.moveTo(prevX, prevY);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 1;
+      animId = requestAnimationFrame(draw);
+    }
+
+    // Clear to background color
+    function clearCanvas() {
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, width(), height());
+    }
+
+    clearCanvas();
+    let animId = requestAnimationFrame(draw);
+
+    // -----------------------------------------------------------------------
+    // Controls wiring
+    // -----------------------------------------------------------------------
+    function wireSlider(id, param, parser = parseFloat) {
+      const input = document.getElementById(`ctrl-${id}`);
+      const display = document.getElementById(`val-${id}`);
+      input.addEventListener('input', () => {
+        const val = parser(input.value);
+        params[param] = val;
+        display.textContent = val;
+
+        // Bulge: when the value string is wide (4+ chars), the panel wall
+        // pushes outward at this row like something is pressing from inside.
+        // Short values sit flush. The spring easing gives it the "tug" feel.
+        const wide = String(val).length >= 4;
+        display.classList.toggle('bulge', wide);
+
+        // Reinit particles if count changed
+        if (param === 'count') initParticles();
+      });
+    }
+
+    wireSlider('scale', 'scale');
+    wireSlider('count', 'count', parseInt);
+    wireSlider('speed', 'speed');
+    wireSlider('life', 'life', parseInt);
+    wireSlider('curl', 'curl');
+
+    document.getElementById('ctrl-palette').addEventListener('change', (e) => {
+      params.paletteName = e.target.value;
+      palette = getPalette(params.paletteName);
+    });
+
+    // Ink mode toggle
+    const btnInk = document.getElementById('btn-ink');
+    btnInk.addEventListener('click', () => {
+      params.inkMode = !params.inkMode;
+      btnInk.classList.toggle('active', params.inkMode);
+    });
+
+    // Pause / play
+    const btnPause = document.getElementById('btn-pause');
+    btnPause.addEventListener('click', () => {
+      params.paused = !params.paused;
+      btnPause.textContent = params.paused ? 'play' : 'pause';
+      btnPause.classList.toggle('active', params.paused);
+    });
+
+    // Clear
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      clearCanvas();
+      initParticles();
+    });
+
+    // New seed
+    document.getElementById('btn-seed').addEventListener('click', () => {
+      currentSeed = Math.floor(Math.random() * 2147483647);
+      noiseSeed(currentSeed);
+      clearCanvas();
+      initParticles();
+    });
+
+    // Save PNG
+    document.getElementById('btn-save').addEventListener('click', () => {
+      saveCanvasPNG(canvas, `flow-field-${currentSeed}.png`);
+    });
+
+    // Toggle UI visibility
+    document.getElementById('toggle-ui').addEventListener('click', () => {
+      document.getElementById('controls').classList.toggle('hidden');
+    });
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+      resize();
+      clearCanvas();
+    });
+  </script>
+</body>
+</html>
