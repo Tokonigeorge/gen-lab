@@ -215,6 +215,14 @@
         <option value="true">distinct only</option>
       </select>
     </div>
+    <div class="control-row">
+      <label>bg</label>
+      <select id="ctrl-bg">
+        <option value="dark" selected>dark</option>
+        <option value="light">light</option>
+        <option value="paper">paper</option>
+      </select>
+    </div>
 
     <div class="button-row">
       <button class="btn" id="btn-save">save PNG</button>
@@ -251,6 +259,17 @@
 
     resize();
     window.addEventListener('resize', () => { resize(); recompute(); });
+
+    // -----------------------------------------------------------------------
+    // Background modes
+    // -----------------------------------------------------------------------
+    const BACKGROUNDS = {
+      dark:  { fill: '#0a0a0f', axis: 'rgba(255,255,255,0.06)', label: 'rgba(255,255,255,0.2)', marker: 'rgba(255,255,255,0.15)', axisLabel: 'rgba(255,255,255,0.12)' },
+      light: { fill: '#f5f2eb', axis: 'rgba(0,0,0,0.08)', label: 'rgba(0,0,0,0.25)', marker: 'rgba(0,0,0,0.2)', axisLabel: 'rgba(0,0,0,0.15)' },
+      paper: { fill: '#e8dfc8', axis: 'rgba(0,0,0,0.1)', label: 'rgba(0,0,0,0.25)', marker: 'rgba(0,0,0,0.2)', axisLabel: 'rgba(0,0,0,0.15)' },
+    };
+
+    function getBg() { return BACKGROUNDS[document.getElementById('ctrl-bg').value]; }
 
     // -----------------------------------------------------------------------
     // State
@@ -332,7 +351,7 @@
       }
 
       // Clear and draw axes once
-      ctx.fillStyle = '#0a0a0f';
+      ctx.fillStyle = getBg().fill;
       ctx.fillRect(0, 0, W, H);
       const padding = 0.85;
       const fitDim = Math.min(W, H) / 2;
@@ -400,7 +419,7 @@
      */
     function render() {
       // Clear to background
-      ctx.fillStyle = '#0a0a0f';
+      ctx.fillStyle = getBg().fill;
       ctx.fillRect(0, 0, W, H);
 
       if (eigenvalues.length === 0) return;
@@ -466,30 +485,32 @@
      * Single color: uniform soft blue for clean structural visualization.
      */
     function getColor(ev, maxMod) {
+      const isDark = document.getElementById('ctrl-bg').value === 'dark';
+
       if (params.colorMode === 'argument') {
-        // atan2 gives the angle in radians [-π, π]
-        // Convert to degrees [0, 360] for HSL hue
         const angle = Math.atan2(ev.im, ev.re);
         const hue = ((angle / Math.PI) * 180 + 360) % 360;
-        return `hsla(${hue}, 80%, 60%, 0.6)`;
+        const lit = isDark ? 60 : 40;
+        return `hsla(${hue}, 80%, ${lit}%, 0.6)`;
       }
 
       if (params.colorMode === 'modulus') {
         const mod = Math.sqrt(ev.re * ev.re + ev.im * ev.im);
         const t = Math.min(mod / maxMod, 1);
-        const lightness = 20 + t * 50;
+        const lightness = isDark ? 20 + t * 50 : 15 + t * 40;
         return `hsla(220, 70%, ${lightness}%, 0.7)`;
       }
 
       // single color
-      return 'rgba(106, 140, 255, 0.5)';
+      return isDark ? 'rgba(106, 140, 255, 0.5)' : 'rgba(40, 60, 180, 0.5)';
     }
 
     /**
      * Draw the real and imaginary axes with light tick marks and scale labels.
      */
     function drawAxes(cx, cy, scale, maxAbs) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      const bg = getBg();
+      ctx.strokeStyle = bg.axis;
       ctx.lineWidth = 1;
 
       // Real axis (horizontal)
@@ -505,13 +526,13 @@
       ctx.stroke();
 
       // Origin marker
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.fillStyle = bg.marker;
       ctx.beginPath();
       ctx.arc(cx, cy, 3, 0, Math.PI * 2);
       ctx.fill();
 
       // Tick marks and labels
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillStyle = bg.label;
       ctx.font = '10px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
@@ -560,7 +581,7 @@
       }
 
       // Axis labels
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.fillStyle = bg.axisLabel;
       ctx.font = '11px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
@@ -607,6 +628,10 @@
     document.getElementById('ctrl-distinct').addEventListener('change', (e) => {
       params.distinct = e.target.value === 'true';
       startReveal();
+    });
+
+    document.getElementById('ctrl-bg').addEventListener('change', () => {
+      if (eigenvalues.length > 0) render();
     });
 
     document.getElementById('btn-save').addEventListener('click', () => {

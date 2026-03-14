@@ -226,6 +226,14 @@
       </select>
     </div>
     <div class="control-row">
+      <label>bg</label>
+      <select id="ctrl-bg">
+        <option value="dark" selected>dark</option>
+        <option value="light">light</option>
+        <option value="paper">paper</option>
+      </select>
+    </div>
+    <div class="control-row">
       <label>seed</label>
       <select id="ctrl-seed-mode">
         <option value="center" selected>center square</option>
@@ -345,6 +353,15 @@
     // total), diagonals get 0.05 each (= 0.2 total), center gets -1.
     // Sum of all weights = 0, which is required: a uniform field should
     // have zero Laplacian (no net flow when everything is equal).
+
+    // -----------------------------------------------------------------------
+    // Background modes
+    // -----------------------------------------------------------------------
+    const BACKGROUNDS = {
+      dark:  { fill: '#0a0a0f', rgb: [10, 10, 15] },
+      light: { fill: '#f5f2eb', rgb: [245, 242, 235] },
+      paper: { fill: '#e8dfc8', rgb: [232, 223, 200] },
+    };
 
     // -----------------------------------------------------------------------
     // Constants
@@ -562,14 +579,22 @@
 
     /** Render the current B grid to the offscreen canvas, then scale to viewport */
     function render() {
+      const bgRGB = BACKGROUNDS[document.getElementById('ctrl-bg').value].rgb;
       for (let i = 0; i < N * N; i++) {
         // Scale B concentration (typically 0–0.35) to the palette's 0–1 range
         const b = Math.min(B0[i] * 3, 1);
-        const [r, g, bl] = currentPaletteFn(b);
         const p = i * 4;
-        pixels[p]     = r;
-        pixels[p + 1] = g;
-        pixels[p + 2] = bl;
+        if (b < 0.001) {
+          // No chemical B present — show background color
+          pixels[p]     = bgRGB[0];
+          pixels[p + 1] = bgRGB[1];
+          pixels[p + 2] = bgRGB[2];
+        } else {
+          const [r, g, bl] = currentPaletteFn(b);
+          pixels[p]     = r;
+          pixels[p + 1] = g;
+          pixels[p + 2] = bl;
+        }
         pixels[p + 3] = 255;
       }
 

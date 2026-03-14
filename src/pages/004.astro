@@ -225,6 +225,15 @@
       </select>
     </div>
 
+    <div class="control-row">
+      <label>bg</label>
+      <select id="ctrl-bg">
+        <option value="dark" selected>dark</option>
+        <option value="light">light</option>
+        <option value="paper">paper</option>
+      </select>
+    </div>
+
     <div class="button-row">
       <button class="btn" id="btn-randomize">randomize</button>
       <button class="btn" id="btn-save">save PNG</button>
@@ -485,6 +494,16 @@
 
     resize();
 
+    // Background modes
+    const BACKGROUNDS = {
+      dark:  { fill: '#0a0a0f', rgb: [10, 10, 15] },
+      light: { fill: '#f5f2eb', rgb: [245, 242, 235] },
+      paper: { fill: '#e8dfc8', rgb: [232, 223, 200] },
+    };
+
+    function getBgRGB() { return BACKGROUNDS[document.getElementById('ctrl-bg').value].rgb; }
+    function getBgFill() { return BACKGROUNDS[document.getElementById('ctrl-bg').value].fill; }
+
     // Color palette — fetched from shared palette system
     let currentPaletteFn = rgbPalettes.ember;
 
@@ -591,7 +610,7 @@
       bounds = computeBounds(attrDef, currentParams);
       if (!bounds) {
         status.textContent = 'divergent — try different parameters';
-        ctx.fillStyle = '#0a0a0f';
+        ctx.fillStyle = getBgFill();
         ctx.fillRect(0, 0, W, H);
         return;
       }
@@ -694,6 +713,7 @@
 
     function renderHits() {
       const palette = currentPaletteFn;
+      const bgRGB = getBgRGB();
 
       // Find the maximum hit count for normalization
       let maxHit = 0;
@@ -702,7 +722,7 @@
       }
 
       if (maxHit === 0) {
-        ctx.fillStyle = '#0a0a0f';
+        ctx.fillStyle = getBgFill();
         ctx.fillRect(0, 0, W, H);
         return;
       }
@@ -715,9 +735,9 @@
 
         if (count === 0) {
           // Background
-          pixels[p]     = 10;
-          pixels[p + 1] = 10;
-          pixels[p + 2] = 15;
+          pixels[p]     = bgRGB[0];
+          pixels[p + 1] = bgRGB[1];
+          pixels[p + 2] = bgRGB[2];
           pixels[p + 3] = 255;
         } else {
           // Log-scaled brightness
@@ -819,6 +839,10 @@
         currentPaletteFn = rgbPalettes[val];
         if (hits) renderHits();
       }
+    });
+
+    document.getElementById('ctrl-bg').addEventListener('change', () => {
+      if (hits) renderHits();
     });
 
     document.getElementById('btn-randomize').addEventListener('click', () => {

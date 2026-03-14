@@ -940,6 +940,109 @@ count = max   → 1.0     (bright)</pre>
     </details>
 
     <!-- ============================================================ -->
+    <!-- EXPERIMENT 005: L-SYSTEMS -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 14px; color: #6a8cff; letter-spacing: 0.06em; text-transform: uppercase; margin: 32px 0 16px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06);">Experiment 005: L-Systems</h2>
+
+    <details open>
+      <summary><span class="num">20</span> L-Systems — Grammar-Based Fractals</summary>
+      <div class="section-body">
+        <p>An <strong>L-system</strong> (Lindenmayer system) is a parallel string rewriting system invented by botanist Aristid Lindenmayer in 1968 to model branching patterns of algae and plants.</p>
+        <p>The process: start with an <strong>axiom</strong> (seed string), apply <strong>production rules</strong> simultaneously to every character, repeat N times, then interpret the result as turtle graphics commands.</p>
+        <p>The key word is "parallel": unlike sequential grammars, ALL characters are replaced in one step. This models biological growth where every cell divides simultaneously.</p>
+        <pre>Axiom:   F--F--F                    (3 F's + separators)
+Iter 1:  F+F--F+F--F+F--F+F--...  (each F → F+F--F+F)
+Iter 2:  each F above → F+F--F+F  (exponential growth)</pre>
+        <p>If a rule maps 1 character to K characters, after N iterations: ~K<sup>N</sup> characters. Koch curve (K=4, N=6): 4<sup>6</sup> = 4096 segments.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> An L-system is like a recipe that refers to itself. "Make a branch" means "make a stem, then make two smaller branches." Each sub-branch follows the same recipe, producing fractal self-similarity from a single instruction.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">21</span> Turtle Graphics and the Power of Brackets</summary>
+      <div class="section-body">
+        <p>A virtual turtle walks the string: <code>F</code> moves forward (drawing), <code>+</code> turns left, <code>-</code> turns right. The magic is in <code>[</code> and <code>]</code>:</p>
+        <pre>F    — move forward, drawing a line
++    — turn left by the angle
+-    — turn right by the angle
+[    — PUSH: save position + heading onto a stack
+]    — POP: restore last saved state</pre>
+        <p>Without brackets, the turtle traces a single continuous path (Koch, dragon). With brackets, it can <strong>branch</strong>: save a fork point, explore one branch, pop back, explore another. This is identical to function call stacks in programming.</p>
+        <pre>String: F[+F][-F]F
+
+F    — draw trunk
+[    — save fork point
++F   — turn left, draw left branch
+]    — pop back to fork
+[-F] — turn right, draw right branch
+F    — continue trunk</pre>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Watch the animated drawing of the Fractal Plant preset. Notice how the turtle draws a branch, pops back to the trunk, draws another branch, pops back again — the stack manages the entire tree structure.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">22</span> Why Angle Changes Everything</summary>
+      <div class="section-body">
+        <p>The SAME rule at DIFFERENT angles produces wildly different geometry. <code>F+F--F+F</code> at 60° gives the Koch snowflake; at 90° it gives a completely different pattern.</p>
+        <p>The rule encodes a <strong>motif</strong> — a shape replacing each segment. But the motif's geometry depends on the turning angle:</p>
+        <pre>At 60°: + turns 60° left, -- turns 120° right
+        → equilateral triangle bump (Koch)
+
+At 90°: + turns 90° left, -- turns 180° right
+        → square bump (different fractal)</pre>
+        <p>Even 1-2° changes can shift a plant from bushy to spindly. In nature, different species use the same branching program with slightly different angles — producing the diversity of leaf shapes from a shared genetic toolkit.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Select the Fractal Plant and slowly drag the angle offset slider. Watch the tree transform from a weeping willow shape (negative offset) to a stiff cactus shape (positive offset) — same rule, different geometry.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">23</span> Fractal Dimension — Between 1D and 2D</summary>
+      <div class="section-body">
+        <p>The Koch curve has dimension log(4)/log(3) ≈ 1.26. A line is 1D. A square is 2D. The Koch curve is "more than a line" (infinitely long) but "less than a surface" (zero area). It lives between dimensions.</p>
+        <p>The computation: each iteration replaces 1 segment with N=4 copies at 1/r = 1/3 the size:</p>
+        <pre>dimension = log(N) / log(1/r) = log(4) / log(3) ≈ 1.2619</pre>
+        <table>
+          <tr><th>L-System</th><th>Dimension</th><th>Intuition</th></tr>
+          <tr><td>Koch curve</td><td>≈ 1.26</td><td>More than a line, less than a surface</td></tr>
+          <tr><td>Sierpinski triangle</td><td>≈ 1.58</td><td>Nearly fills a triangle but with infinite holes</td></tr>
+          <tr><td>Dragon curve</td><td>2.0</td><td>Actually fills area — a space-filling curve</td></tr>
+          <tr><td>Fractal plant</td><td>~1.5–1.8</td><td>Varies with angle; fills space like real vegetation</td></tr>
+        </table>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> Fractal dimension measures "how much stuff fills the space." Crumple a piece of string into a ball — it's still 1D (a curve), but it occupies 3D space more effectively. The Koch curve is like a piece of string crumpled so thoroughly that it's partway to being a sheet.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">24</span> Why Plants Grow This Way</summary>
+      <div class="section-body">
+        <p>Real plants exhibit self-similarity: a branch resembles the whole tree, a fern frond resembles a whole fern. This is <strong>optimal packing</strong>:</p>
+        <ul>
+          <li><strong>Maximum light capture</strong> — branches spread to fill space without overlapping</li>
+          <li><strong>Structural efficiency</strong> — the same pattern distributes load at every scale</li>
+          <li><strong>Minimal genetic information</strong> — one simple rule, applied recursively, produces complex form</li>
+        </ul>
+        <p>In the fractal plant L-system, <code>X</code> = meristem (growth tip), <code>F</code> = internode (stem segment), <code>[</code>/<code>]</code> = branching. The production rule IS the growth program.</p>
+        <p>Angle determines species-level differences: 25° → broad deciduous tree, 22.5° → dense fern, 15° → narrow conifer. Nature uses the same algorithm with different parameters.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Compare the Fractal Plant (25°) with the Barnsley Fern (22.5°). Same rules, 2.5° difference — yet one looks like an herb and the other like a fern. This is how evolution tweaks body plans: same program, different constants.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
     <!-- GLOSSARY -->
     <!-- ============================================================ -->
     <details>
@@ -975,6 +1078,13 @@ count = max   → 1.0     (bright)</pre>
           <tr><td><strong>Fractal dimension</strong></td><td>Non-integer dimension — a curve that's "more than 1D but less than 2D"</td></tr>
           <tr><td><strong>Iterated map</strong></td><td>A dynamical system where each step is a function of the current state</td></tr>
           <tr><td><strong>Histogram equalization</strong></td><td>Remapping pixel values to reveal hidden structure in uneven data</td></tr>
+          <tr><td><strong>L-system</strong></td><td>Parallel string rewriting system for generating fractals and plant-like forms</td></tr>
+          <tr><td><strong>Axiom</strong></td><td>The starting string of an L-system — the seed from which the fractal grows</td></tr>
+          <tr><td><strong>Production rule</strong></td><td>A substitution applied simultaneously to every matching character</td></tr>
+          <tr><td><strong>Turtle graphics</strong></td><td>Interpreting a string as movement commands for a virtual "turtle" with a pen</td></tr>
+          <tr><td><strong>Stack (branching)</strong></td><td>[ pushes state, ] pops — enables tree-like branching by saving/restoring position</td></tr>
+          <tr><td><strong>Self-similarity</strong></td><td>A structure that looks the same at different scales — the hallmark of fractals</td></tr>
+          <tr><td><strong>Koch curve</strong></td><td>Classic L-system fractal with dimension ≈ 1.26 — infinitely long, zero area</td></tr>
         </table>
       </div>
     </details>
@@ -1000,6 +1110,8 @@ count = max   → 1.0     (bright)</pre>
           <li><a href="https://journals.ametsoc.org/view/journals/atsc/20/2/1520-0469_1963_020_0130_dnf_2_0_co_2.xml">Edward Lorenz, "Deterministic Nonperiodic Flow" (1963)</a> — the founding paper on chaos</li>
           <li><a href="https://sprott.physics.wisc.edu/fractals.htm">Julien C. Sprott, Strange Attractor Gallery</a> — thousands of attractors with parameters</li>
           <li><a href="https://en.wikipedia.org/wiki/Clifford_A._Pickover">Clifford Pickover</a> — originator of the Clifford attractor family</li>
+          <li><a href="http://algorithmicbotany.org/papers/abop/abop.pdf">Prusinkiewicz & Lindenmayer, <em>The Algorithmic Beauty of Plants</em></a> — the definitive L-system reference (free PDF)</li>
+          <li><a href="https://en.wikipedia.org/wiki/The_Fractal_Geometry_of_Nature">Benoit Mandelbrot, <em>The Fractal Geometry of Nature</em></a> — the book that launched fractal geometry</li>
         </ul>
       </div>
     </details>

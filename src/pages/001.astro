@@ -220,6 +220,14 @@
         <option value="custom">custom...</option>
       </select>
     </div>
+    <div class="control-row">
+      <label>bg</label>
+      <select id="ctrl-bg">
+        <option value="dark" selected>dark</option>
+        <option value="light">light</option>
+        <option value="paper">paper</option>
+      </select>
+    </div>
 
     <div class="button-row">
       <button class="btn" id="btn-ink">ink mode</button>
@@ -234,6 +242,15 @@
     import { seed as noiseSeed, simplex2D, fractal2D } from '../shared/noise.js';
     import { rgbPalettes, makeCustomPalette, rgbToCSS, buildSwatchPicker } from '../shared/colors.js';
     import { createFullscreenCanvas, saveCanvasPNG } from '../shared/canvas.js';
+
+    // -----------------------------------------------------------------------
+    // Background modes
+    // -----------------------------------------------------------------------
+    const BACKGROUNDS = {
+      dark:  { fill: '#0a0a0f', fadeRGB: '10, 10, 15' },
+      light: { fill: '#f5f2eb', fadeRGB: '245, 242, 235' },
+      paper: { fill: '#e8dfc8', fadeRGB: '232, 223, 200' },
+    };
 
     // -----------------------------------------------------------------------
     // Setup
@@ -389,7 +406,8 @@
       // Fade layer: semi-transparent bg rectangle to create trailing effect
       // In ink mode, we skip this so strokes accumulate permanently
       if (!params.inkMode) {
-        ctx.fillStyle = 'rgba(10, 10, 15, 0.04)';
+        const bg = BACKGROUNDS[document.getElementById('ctrl-bg').value];
+        ctx.fillStyle = `rgba(${bg.fadeRGB}, 0.04)`;
         ctx.fillRect(0, 0, w, h);
       }
 
@@ -441,7 +459,8 @@
 
     // Clear to background color
     function clearCanvas() {
-      ctx.fillStyle = '#0a0a0f';
+      const bg = BACKGROUNDS[document.getElementById('ctrl-bg').value];
+      ctx.fillStyle = bg.fill;
       ctx.fillRect(0, 0, width(), height());
     }
 
@@ -490,6 +509,10 @@
         swatchPicker.hide();
         paletteFn = rgbPalettes[val];
       }
+    });
+
+    document.getElementById('ctrl-bg').addEventListener('change', () => {
+      clearCanvas();
     });
 
     // Ink mode toggle

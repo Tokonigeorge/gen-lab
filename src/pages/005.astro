@@ -1,0 +1,884 @@
+---
+/**
+ * Experiment 005: L-Systems
+ *
+ * Interactive renderer for Lindenmayer Systems — grammar-based fractals that
+ * model plant growth, snowflakes, and geometric self-similarity. A string is
+ * rewritten by parallel substitution rules, then interpreted as turtle graphics
+ * instructions to produce intricate fractal geometry.
+ *
+ * WHAT IS AN L-SYSTEM?
+ * --------------------
+ * Invented by botanist Aristid Lindenmayer in 1968 to model the branching
+ * patterns of algae and plants. An L-system is a PARALLEL string rewriting
+ * system:
+ *
+ *   1. Start with an AXIOM — a short seed string (e.g. "F--F--F")
+ *   2. Apply PRODUCTION RULES simultaneously to every character
+ *      (e.g. F → F+F--F+F means: replace every F with the new string)
+ *   3. Repeat N times — the string grows exponentially
+ *   4. Interpret the final string as TURTLE GRAPHICS commands
+ *
+ * The key word is "parallel": unlike sequential rewriting (Chomsky grammars),
+ * ALL characters are replaced in one step. This models biological growth where
+ * every cell divides simultaneously.
+ *
+ * WHY PLANTS GROW THIS WAY
+ * ------------------------
+ * Real plants exhibit self-similarity at multiple scales: a branch looks like
+ * a smaller version of the whole tree, a fern frond looks like a smaller fern.
+ * This isn't coincidence — it's optimal packing. By repeating the same growth
+ * rule at every scale, plants maximize light capture and structural efficiency
+ * with minimal genetic information. An L-system captures this: one simple rule,
+ * applied recursively, produces complex organic form.
+ *
+ * WHAT IS TURTLE GRAPHICS?
+ * ------------------------
+ * Imagine a turtle on a canvas holding a pen. It understands simple commands:
+ *   F — move forward one step (drawing a line)
+ *   G — move forward one step (drawing a line, alternative symbol)
+ *   + — turn left by the angle
+ *   - — turn right by the angle
+ *   [ — PUSH: save current position + angle onto a stack
+ *   ] — POP: restore the last saved position + angle
+ *
+ * WHY [ AND ] ARE SO POWERFUL — BRANCHING VIA A STACK
+ * ---------------------------------------------------
+ * The bracket operators are what make L-systems capable of producing trees
+ * and plants, not just space-filling curves. [ saves the turtle's state
+ * (position + heading) onto a stack. ] restores the most recently saved
+ * state. This creates BRANCHING: the turtle can explore one branch, pop
+ * back to the fork, and explore another. Each nested [ increases the
+ * "depth" — like nested function calls, the stack tracks where to return.
+ *
+ * Without brackets, the turtle can only trace a single continuous path.
+ * With brackets, it can trace an entire tree.
+ *
+ * WHY ANGLE MATTERS SO MUCH
+ * -------------------------
+ * The SAME rule at DIFFERENT angles produces wildly different geometry.
+ * F+F--F+F at 60° gives the Koch snowflake (triangular). At 90° it gives
+ * a completely different space-filling pattern. Small angle changes (even
+ * 1-2°) can shift a plant from bushy to spindly, or turn a curve from
+ * open to self-intersecting. This is worth exploring — the angle slider
+ * lets you see these transitions in real time.
+ *
+ * FRACTAL DIMENSION — BETWEEN 1D AND 2D
+ * --------------------------------------
+ * The Koch curve has a fractal dimension of log(4)/log(3) ≈ 1.26. What
+ * does this mean intuitively? A straight line is 1D. A filled square is
+ * 2D. The Koch curve is "more than a line" — it's infinitely long and
+ * infinitely detailed — but "less than a surface" — it has zero area.
+ * It lives between dimensions. Every iteration makes it longer (×4/3),
+ * yet it fits in the same bounding triangle. More detail, same space.
+ */
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>005 — L-Systems | Generative Lab</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100dvw;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      width: 280px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.3s;
+      overflow: visible;
+    }
+
+    #controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #controls h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-row label {
+      flex-shrink: 0;
+      color: #aaa;
+      min-width: 20px;
+    }
+
+    .control-row input[type="range"] {
+      flex: 1;
+      accent-color: #6a8cff;
+    }
+
+    .control-row .value {
+      text-align: right;
+      color: #6a8cff;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      min-width: 36px;
+      padding: 4px 12px 4px 8px;
+      margin-right: -21px;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      transform: translateX(0);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .control-row .value.bulge {
+      transform: translateX(12px);
+    }
+
+    .control-row select {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: #ccc;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: rgba(255, 255, 255, 0.12); }
+
+    #toggle-ui {
+      position: fixed;
+      top: 16px;
+      right: 312px;
+      z-index: 11;
+      background: rgba(10, 10, 15, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: #888;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #toggle-ui:hover { color: #ccc; }
+
+    #back {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11;
+      color: #555;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #back:hover { color: #aaa; }
+
+    #status {
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+    }
+
+    .separator {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      margin: 2px 0;
+    }
+  </style>
+</head>
+<body>
+  <a id="back" href="/">← gallery</a>
+  <button id="toggle-ui">UI</button>
+
+  <div id="canvas-container"></div>
+
+  <div id="controls">
+    <h2>005 — L-Systems</h2>
+
+    <div class="control-row">
+      <label>preset</label>
+      <select id="ctrl-preset">
+        <option value="koch">Koch Snowflake</option>
+        <option value="sierpinski">Sierpinski Triangle</option>
+        <option value="dragon">Dragon Curve</option>
+        <option value="plant" selected>Fractal Plant</option>
+        <option value="fern">Barnsley Fern</option>
+        <option value="pentigree">Pentigree</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label>iter</label>
+      <input type="range" id="ctrl-iter" min="1" max="8" step="1" value="6" />
+      <span class="value" id="val-iter">6</span>
+    </div>
+
+    <div class="control-row">
+      <label>angle</label>
+      <input type="range" id="ctrl-angle" min="-30" max="30" step="0.5" value="0" />
+      <span class="value" id="val-angle">0°</span>
+    </div>
+
+    <div class="control-row">
+      <label>length</label>
+      <input type="range" id="ctrl-length" min="0.2" max="3" step="0.1" value="1" />
+      <span class="value" id="val-length">1×</span>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-row">
+      <label>color</label>
+      <select id="ctrl-color">
+        <option value="single">single</option>
+        <option value="depth" selected>depth</option>
+        <option value="gradient">gradient</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label>bg</label>
+      <select id="ctrl-bg">
+        <option value="dark" selected>dark</option>
+        <option value="light">light</option>
+        <option value="paper">paper</option>
+      </select>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="button-row">
+      <button class="btn" id="btn-save">save PNG</button>
+    </div>
+
+    <div id="status">ready</div>
+  </div>
+
+  <script>
+    import { saveCanvasPNG } from '../shared/canvas.js';
+
+    // -----------------------------------------------------------------------
+    // L-SYSTEM PRESETS
+    // -----------------------------------------------------------------------
+    //
+    // Each preset defines:
+    //   axiom  — the starting string (the "seed")
+    //   rules  — production rules: which character becomes which string
+    //   angle  — the turning angle in degrees
+    //   iter   — recommended number of iterations
+    //
+    // The axiom is typically short. After N iterations, the string grows
+    // exponentially: if each F becomes 4 characters, after 6 iterations
+    // a single F becomes 4^6 = 4096 characters. This exponential growth
+    // is what produces fractal detail at every scale.
+    // -----------------------------------------------------------------------
+
+    const PRESETS = {
+      koch: {
+        name: 'Koch Snowflake',
+        axiom: 'F--F--F',
+        rules: { F: 'F+F--F+F' },
+        angle: 60,
+        iter: 4,
+        // The Koch snowflake starts as an equilateral triangle (F--F--F with
+        // 60° turns = three sides at 120° apart). Each side is replaced by
+        // the Koch curve motif: go forward, turn 60° left, forward, turn 120°
+        // right, forward, turn 60° left, forward. This adds a triangular bump
+        // to each side. After infinite iterations, the perimeter is infinite
+        // but the area is finite (bounded by a circle). Fractal dimension:
+        // log(4)/log(3) ≈ 1.2619 — more than a line, less than a surface.
+      },
+
+      sierpinski: {
+        name: 'Sierpinski Triangle',
+        axiom: 'F-G-G',
+        rules: { F: 'F-G+F+G-F', G: 'GG' },
+        angle: 120,
+        iter: 6,
+        // The Sierpinski triangle is one of the simplest fractals: a triangle
+        // with its center triangle removed, recursively. This L-system traces
+        // it as a space-filling curve using two symbols F and G (both draw lines
+        // but have different replacement rules). The 120° angle creates the
+        // triangular geometry. Fractal dimension: log(3)/log(2) ≈ 1.585.
+      },
+
+      dragon: {
+        name: 'Dragon Curve',
+        axiom: 'FX',
+        rules: { X: 'X+YF+', Y: '-FX-Y' },
+        angle: 90,
+        iter: 12,
+        // The dragon curve was discovered by NASA physicists John Heighway,
+        // Bruce Banks, and William Harter in 1966. You can create it physically
+        // by folding a strip of paper in half repeatedly, then unfolding to 90°.
+        // X and Y are "virtual" symbols — they control the structure but don't
+        // draw anything themselves. Only F draws a line. The result is a
+        // space-filling curve that tiles the plane: four copies arranged around
+        // a point fill space with no gaps or overlaps.
+      },
+
+      plant: {
+        name: 'Fractal Plant',
+        axiom: 'X',
+        rules: { X: 'F+[[X]-X]-F[-FX]+X', F: 'FF' },
+        angle: 25,
+        iter: 6,
+        // This is the classic "weed" or bracketed OL-system. X is the growth
+        // tip: it produces a stem (F), then branches left (+ [[X]) and right
+        // (-X), creating a tree structure. F→FF doubles stem length each
+        // iteration, making newer branches shorter than older ones — just like
+        // real plants. The 25° angle produces a realistic branching pattern.
+        //
+        // CONNECTION TO REAL PLANT MORPHOLOGY:
+        // Plants grow from meristems (growth tips) that can branch. Each
+        // meristem follows the same genetic program. An L-system models this:
+        // X = meristem, F = internode (stem segment), [/] = branching. The
+        // result looks biological because it IS biological — this is literally
+        // how plants encode their growth.
+      },
+
+      fern: {
+        name: 'Barnsley Fern',
+        axiom: 'X',
+        rules: { X: 'F+[[X]-X]-F[-FX]+X', F: 'FF' },
+        angle: 22.5,
+        iter: 7,
+        // Same rules as the fractal plant, but a tighter angle (22.5° vs 25°)
+        // and one more iteration. This small change produces a denser, more
+        // fern-like structure — demonstrating how sensitive L-systems are to
+        // angle. In nature, different species use the same branching program
+        // with slightly different angles, producing the diversity of leaf shapes
+        // from a shared genetic toolkit.
+      },
+
+      pentigree: {
+        name: 'Pentigree',
+        axiom: 'F-F-F-F-F',
+        rules: { F: 'F-F++F+F-F-F' },
+        angle: 72,
+        iter: 4,
+        // Pentigree is a pentagonal fractal — the axiom draws a regular pentagon
+        // (five sides, each separated by 72° = 360°/5). The replacement rule
+        // adds a decorative bump to each edge, similar to Koch but with fivefold
+        // symmetry. The result has the aesthetic of Islamic geometric art, with
+        // intricate five-pointed star motifs at every scale.
+      },
+    };
+
+    // -----------------------------------------------------------------------
+    // L-SYSTEM STRING REWRITING ENGINE
+    // -----------------------------------------------------------------------
+    //
+    // The rewriting step is conceptually simple but computationally important:
+    // we scan the current string character by character and replace each one
+    // according to the rules. Characters not in the rules pass through unchanged.
+    //
+    // PARALLEL vs SEQUENTIAL: In a Chomsky grammar (like most programming
+    // languages), rules are applied one at a time. In an L-system, ALL
+    // characters are replaced simultaneously in one pass. This models biological
+    // growth: every cell divides at once, not one after another.
+    //
+    // The string grows exponentially. If a rule maps one character to K
+    // characters, after N iterations you have ~K^N characters. For the Koch
+    // curve (K=4, N=6), that's 4^6 = 4096 segments. We cap iterations to
+    // prevent the browser from choking on multi-million character strings.
+    // -----------------------------------------------------------------------
+
+    function rewrite(axiom, rules, iterations, maxLen = Infinity) {
+      let current = axiom;
+      for (let i = 0; i < iterations; i++) {
+        let next = '';
+        for (const ch of current) {
+          next += rules[ch] ?? ch;
+          if (next.length > maxLen) return null; // too large, bail
+        }
+        current = next;
+      }
+      return current;
+    }
+
+    // -----------------------------------------------------------------------
+    // TURTLE GRAPHICS INTERPRETER
+    // -----------------------------------------------------------------------
+    //
+    // The turtle walks the string, maintaining its state:
+    //   (x, y)   — position on the canvas
+    //   angle    — heading in radians (0 = pointing right)
+    //   depth    — current stack depth (how many [ are open)
+    //
+    // Commands:
+    //   F, G  — move forward by `stepLen`, recording the line segment
+    //   +     — turn left (counter-clockwise) by the angle
+    //   -     — turn right (clockwise) by the angle
+    //   [     — PUSH state onto stack (save position + heading for later)
+    //   ]     — POP state from stack (return to saved position + heading)
+    //
+    // THE STACK IS THE KEY TO BRANCHING:
+    // When the turtle hits [, it saves its current position and heading.
+    // It then explores a branch. When it hits ], it teleports back to the
+    // saved state and can start a new branch from the same fork point.
+    // Nested brackets create sub-branches — the stack tracks the full
+    // return path. This is identical to how function call stacks work in
+    // programming: [ = function call, ] = return.
+    //
+    // We do TWO passes:
+    //   Pass 1: compute the bounding box of all segments (no drawing)
+    //   Pass 2: draw with a transform that centers and scales to fit the canvas
+    // -----------------------------------------------------------------------
+
+    function interpretToSegments(str, angleDeg, stepLen) {
+      const angleRad = angleDeg * Math.PI / 180;
+      const segments = [];
+      let x = 0, y = 0, heading = -Math.PI / 2; // Start pointing up
+      let depth = 0;
+      let maxDepth = 0;
+      const stack = [];
+
+      for (const ch of str) {
+        switch (ch) {
+          case 'F':
+          case 'G': {
+            // Move forward, recording the line segment with its stack depth
+            const nx = x + Math.cos(heading) * stepLen;
+            const ny = y + Math.sin(heading) * stepLen;
+            segments.push({ x1: x, y1: y, x2: nx, y2: ny, depth });
+            x = nx;
+            y = ny;
+            break;
+          }
+          case '+':
+            // Turn left (counter-clockwise) — subtract angle because
+            // screen Y is inverted, but we handle that in the transform
+            heading -= angleRad;
+            break;
+          case '-':
+            // Turn right (clockwise)
+            heading += angleRad;
+            break;
+          case '[':
+            // PUSH — save the turtle's state so we can return here later.
+            // This is the "fork" point of a branch. Everything between this
+            // [ and its matching ] is a sub-branch that the turtle explores
+            // and then backtracks from.
+            stack.push({ x, y, heading, depth });
+            depth++;
+            if (depth > maxDepth) maxDepth = depth;
+            break;
+          case ']':
+            // POP — restore the last saved state. The turtle "teleports" back
+            // to the fork point, ready to start a new branch. The stack ensures
+            // correct nesting: the most recent [ is always restored first (LIFO).
+            if (stack.length > 0) {
+              const saved = stack.pop();
+              x = saved.x;
+              y = saved.y;
+              heading = saved.heading;
+              depth = saved.depth;
+            }
+            break;
+          // Characters like X, Y that have no drawing command are ignored.
+          // They exist only to control the string rewriting — they're
+          // "structural" symbols that shape the grammar but produce no
+          // visible output.
+        }
+      }
+
+      return { segments, maxDepth };
+    }
+
+    // -----------------------------------------------------------------------
+    // BOUNDING BOX AND AUTO-SCALING
+    // -----------------------------------------------------------------------
+    //
+    // L-systems can produce geometry at any position and scale depending on
+    // the axiom, rules, angle, and iterations. To display them nicely, we
+    // compute the bounding box of all segments, then apply a transform that
+    // centers and scales the result to fit the canvas with padding.
+    // -----------------------------------------------------------------------
+
+    function computeBounds(segments) {
+      let xMin = Infinity, xMax = -Infinity;
+      let yMin = Infinity, yMax = -Infinity;
+
+      for (const s of segments) {
+        if (s.x1 < xMin) xMin = s.x1;
+        if (s.x1 > xMax) xMax = s.x1;
+        if (s.y1 < yMin) yMin = s.y1;
+        if (s.y1 > yMax) yMax = s.y1;
+        if (s.x2 < xMin) xMin = s.x2;
+        if (s.x2 > xMax) xMax = s.x2;
+        if (s.y2 < yMin) yMin = s.y2;
+        if (s.y2 > yMax) yMax = s.y2;
+      }
+
+      return { xMin, xMax, yMin, yMax };
+    }
+
+    // -----------------------------------------------------------------------
+    // Canvas setup
+    // -----------------------------------------------------------------------
+    const container = document.getElementById('canvas-container');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'display:block;width:100%;height:100%;';
+    container.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    let W = 0, H = 0;
+
+    function resize() {
+      W = container.clientWidth;
+      H = container.clientHeight;
+      canvas.width = W;
+      canvas.height = H;
+    }
+
+    resize();
+
+    // -----------------------------------------------------------------------
+    // Background definitions
+    // -----------------------------------------------------------------------
+    const BACKGROUNDS = {
+      dark:  { fill: '#0a0a0f', defaultStroke: '#c8d4ff' },
+      light: { fill: '#f5f2eb', defaultStroke: '#2a2a3a' },
+      paper: { fill: '#e8dfc8', defaultStroke: '#3a3020' },
+    };
+
+    // -----------------------------------------------------------------------
+    // Color mode functions
+    // -----------------------------------------------------------------------
+    //
+    // Three ways to color the segments:
+    //   single   — one uniform color (the background's default stroke)
+    //   depth    — hue mapped to stack depth. Deeper branches get warmer hues.
+    //              This reveals the branching structure visually.
+    //   gradient — hue mapped to segment index / total segments, creating a
+    //              smooth rainbow along the drawing path.
+    // -----------------------------------------------------------------------
+
+    function getSegmentColor(mode, index, totalSegments, depth, maxDepth, bg) {
+      const defaults = BACKGROUNDS[bg];
+      switch (mode) {
+        case 'single':
+          return defaults.defaultStroke;
+        case 'depth': {
+          // Map stack depth to hue: 0 (trunk) = cool blue, max (tips) = warm gold
+          const t = maxDepth > 0 ? depth / maxDepth : 0;
+          const hue = 220 - t * 180; // 220° (blue) → 40° (gold)
+          const sat = 60 + t * 30;
+          const lit = bg === 'dark' ? 55 + t * 20 : 30 + t * 15;
+          return `hsl(${hue}, ${sat}%, ${lit}%)`;
+        }
+        case 'gradient': {
+          // Map segment index to full hue wheel
+          const t = totalSegments > 1 ? index / (totalSegments - 1) : 0;
+          const hue = t * 300; // 0° (red) → 300° (magenta)
+          const lit = bg === 'dark' ? 60 : 35;
+          return `hsl(${hue}, 75%, ${lit}%)`;
+        }
+        default:
+          return defaults.defaultStroke;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Drawing — animated progressive reveal
+    // -----------------------------------------------------------------------
+    //
+    // Instead of drawing all segments at once, we reveal them progressively
+    // over ~2 seconds. This creates an animation where you watch the L-system
+    // being "drawn" by the turtle, making the construction process visible.
+    // The animation also makes it easy to see the order in which segments
+    // are traced — trunk first, then branches, then sub-branches.
+    // -----------------------------------------------------------------------
+
+    let animId = null;
+    let currentSegments = [];
+    let currentMaxDepth = 0;
+
+    function cancelAnim() {
+      if (animId !== null) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    }
+
+    function drawFrame(segments, maxDepth, upTo, bg, colorMode) {
+      const bgDef = BACKGROUNDS[bg];
+      ctx.fillStyle = bgDef.fill;
+      ctx.fillRect(0, 0, W, H);
+
+      if (segments.length === 0) return;
+
+      // Compute bounding box and scale transform
+      const bounds = computeBounds(segments);
+      const bw = bounds.xMax - bounds.xMin || 1;
+      const bh = bounds.yMax - bounds.yMin || 1;
+
+      // Fit to canvas with padding
+      const pad = 40;
+      const scaleX = (W - pad * 2) / bw;
+      const scaleY = (H - pad * 2) / bh;
+      const scale = Math.min(scaleX, scaleY);
+
+      // Center offset
+      const cx = (W - bw * scale) / 2 - bounds.xMin * scale;
+      const cy = (H - bh * scale) / 2 - bounds.yMin * scale;
+
+      // Line width scales inversely with segment count for readability
+      const lw = Math.max(0.3, Math.min(2, 800 / segments.length));
+      ctx.lineWidth = lw;
+      ctx.lineCap = 'round';
+
+      // Draw segments up to the animation index
+      const count = Math.min(upTo, segments.length);
+
+      // For single-color mode, batch into one path for performance
+      if (colorMode === 'single') {
+        ctx.strokeStyle = bgDef.defaultStroke;
+        ctx.beginPath();
+        for (let i = 0; i < count; i++) {
+          const s = segments[i];
+          ctx.moveTo(s.x1 * scale + cx, s.y1 * scale + cy);
+          ctx.lineTo(s.x2 * scale + cx, s.y2 * scale + cy);
+        }
+        ctx.stroke();
+      } else {
+        // Per-segment color — need individual strokes
+        for (let i = 0; i < count; i++) {
+          const s = segments[i];
+          ctx.strokeStyle = getSegmentColor(
+            colorMode, i, segments.length, s.depth, maxDepth, bg
+          );
+          ctx.beginPath();
+          ctx.moveTo(s.x1 * scale + cx, s.y1 * scale + cy);
+          ctx.lineTo(s.x2 * scale + cx, s.y2 * scale + cy);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function animateDraw() {
+      cancelAnim();
+
+      const segments = currentSegments;
+      const maxDepth = currentMaxDepth;
+      const bg = document.getElementById('ctrl-bg').value;
+      const colorMode = document.getElementById('ctrl-color').value;
+      const total = segments.length;
+      const status = document.getElementById('status');
+
+      if (total === 0) {
+        const bgDef = BACKGROUNDS[bg];
+        ctx.fillStyle = bgDef.fill;
+        ctx.fillRect(0, 0, W, H);
+        status.textContent = 'no segments';
+        return;
+      }
+
+      // Animation duration: ~2 seconds, but at least 1 segment per frame
+      // and at most the total count
+      const duration = 2000; // ms
+      const startTime = performance.now();
+
+      function frame(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / duration);
+
+        // Ease-out for a satisfying draw that slows at the end
+        const eased = 1 - Math.pow(1 - progress, 2);
+        const upTo = Math.ceil(eased * total);
+
+        drawFrame(segments, maxDepth, upTo, bg, colorMode);
+
+        const pct = Math.round(progress * 100);
+        status.textContent = `drawing… ${pct}% · ${upTo.toLocaleString()} / ${total.toLocaleString()} segments`;
+
+        if (progress < 1) {
+          animId = requestAnimationFrame(frame);
+        } else {
+          animId = null;
+          status.textContent = `${total.toLocaleString()} segments · done`;
+        }
+      }
+
+      animId = requestAnimationFrame(frame);
+    }
+
+    // -----------------------------------------------------------------------
+    // Main: generate L-system and start drawing
+    // -----------------------------------------------------------------------
+
+    function generate() {
+      const presetKey = document.getElementById('ctrl-preset').value;
+      const preset = PRESETS[presetKey];
+      const iterations = parseInt(document.getElementById('ctrl-iter').value);
+      const angleOffset = parseFloat(document.getElementById('ctrl-angle').value);
+      const lengthMul = parseFloat(document.getElementById('ctrl-length').value);
+      const status = document.getElementById('status');
+
+      const angle = preset.angle + angleOffset;
+
+      status.textContent = 'rewriting…';
+
+      // Safety: generate the string but bail if it grows too large.
+      // We can't estimate accurately because different characters have
+      // different rule lengths, so we check during rewriting instead.
+      const str = rewrite(preset.axiom, preset.rules, iterations, 5_000_000);
+      if (str === null) {
+        status.textContent = 'too many iterations — reduce iter count';
+        return;
+      }
+
+      // Step length: auto-computed to fit nicely, adjustable by the user
+      // We use a base of 4 pixels, which the auto-scaling will adjust anyway
+      const stepLen = 4 * lengthMul;
+
+      status.textContent = 'interpreting…';
+      const { segments, maxDepth } = interpretToSegments(str, angle, stepLen);
+      currentSegments = segments;
+      currentMaxDepth = maxDepth;
+
+      animateDraw();
+    }
+
+    // -----------------------------------------------------------------------
+    // Controls
+    // -----------------------------------------------------------------------
+
+    const presetSelect = document.getElementById('ctrl-preset');
+    const iterSlider = document.getElementById('ctrl-iter');
+    const iterVal = document.getElementById('val-iter');
+    const angleSlider = document.getElementById('ctrl-angle');
+    const angleVal = document.getElementById('val-angle');
+    const lengthSlider = document.getElementById('ctrl-length');
+    const lengthVal = document.getElementById('val-length');
+
+    // When preset changes, reset iterations and angle to preset defaults
+    presetSelect.addEventListener('change', () => {
+      const preset = PRESETS[presetSelect.value];
+      iterSlider.value = preset.iter;
+      iterVal.textContent = preset.iter;
+      angleSlider.value = 0;
+      angleVal.textContent = '0°';
+      lengthSlider.value = 1;
+      lengthVal.textContent = '1×';
+      generate();
+    });
+
+    iterSlider.addEventListener('input', () => {
+      iterVal.textContent = iterSlider.value;
+      generate();
+    });
+
+    angleSlider.addEventListener('input', () => {
+      const v = parseFloat(angleSlider.value);
+      angleVal.textContent = (v >= 0 ? '+' : '') + v + '°';
+      const wide = angleVal.textContent.length >= 5;
+      angleVal.classList.toggle('bulge', wide);
+      generate();
+    });
+
+    lengthSlider.addEventListener('input', () => {
+      lengthVal.textContent = parseFloat(lengthSlider.value).toFixed(1) + '×';
+      generate();
+    });
+
+    document.getElementById('ctrl-color').addEventListener('change', () => {
+      // Redraw immediately without re-generating (just re-animate)
+      animateDraw();
+    });
+
+    document.getElementById('ctrl-bg').addEventListener('change', () => {
+      animateDraw();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      saveCanvasPNG(canvas, `l-system-${presetSelect.value}.png`);
+    });
+
+    document.getElementById('toggle-ui').addEventListener('click', () => {
+      document.getElementById('controls').classList.toggle('hidden');
+    });
+
+    window.addEventListener('resize', () => {
+      resize();
+      // Redraw at current state without re-animating
+      if (currentSegments.length > 0) {
+        const bg = document.getElementById('ctrl-bg').value;
+        const colorMode = document.getElementById('ctrl-color').value;
+        drawFrame(currentSegments, currentMaxDepth, currentSegments.length, bg, colorMode);
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // Go — wait for layout to settle so the container has real dimensions
+    // -----------------------------------------------------------------------
+    function boot() {
+      resize();
+      if (W > 0 && H > 0) {
+        generate();
+      } else {
+        requestAnimationFrame(boot);
+      }
+    }
+    requestAnimationFrame(boot);
+  </script>
+</body>
+</html>
