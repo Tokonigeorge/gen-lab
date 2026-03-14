@@ -210,6 +210,14 @@
         <option value="cold">cold</option>
         <option value="rust">rust</option>
         <option value="neon">neon</option>
+        <option value="ember">ember</option>
+        <option value="ice">ice</option>
+        <option value="emerald">emerald</option>
+        <option value="plasma">plasma</option>
+        <option value="ocean">ocean</option>
+        <option value="sunset">sunset</option>
+        <option value="mono">mono</option>
+        <option value="custom">custom...</option>
       </select>
     </div>
 
@@ -223,9 +231,9 @@
   </div>
 
   <script>
-    import { seed as noiseSeed, simplex2D, fractal2D } from '../../shared/noise.js';
-    import { getPalette } from '../../shared/colors.js';
-    import { createFullscreenCanvas, saveCanvasPNG } from '../../shared/canvas.js';
+    import { seed as noiseSeed, simplex2D, fractal2D } from '../shared/noise.js';
+    import { rgbPalettes, makeCustomPalette, rgbToCSS, buildSwatchPicker } from '../shared/colors.js';
+    import { createFullscreenCanvas, saveCanvasPNG } from '../shared/canvas.js';
 
     // -----------------------------------------------------------------------
     // Setup
@@ -250,7 +258,7 @@
     let currentSeed = Math.floor(Math.random() * 2147483647);
     noiseSeed(currentSeed);
 
-    let palette = getPalette(params.paletteName);
+    let paletteFn = rgbPalettes[params.paletteName];
     let particles = [];
 
     // -----------------------------------------------------------------------
@@ -418,8 +426,7 @@
         p.age++;
 
         // Draw a short line segment from old position to new
-        const color = palette(lifeRatio);
-        ctx.strokeStyle = color;
+        ctx.strokeStyle = rgbToCSS(paletteFn(lifeRatio), alpha);
         ctx.lineWidth = 0.8;
         ctx.globalAlpha = alpha;
         ctx.beginPath();
@@ -469,9 +476,20 @@
     wireSlider('life', 'life', parseInt);
     wireSlider('curl', 'curl');
 
-    document.getElementById('ctrl-palette').addEventListener('change', (e) => {
-      params.paletteName = e.target.value;
-      palette = getPalette(params.paletteName);
+    const paletteSelect = document.getElementById('ctrl-palette');
+    const swatchPicker = buildSwatchPicker(paletteSelect, (hex) => {
+      paletteFn = makeCustomPalette(hex);
+    });
+
+    paletteSelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      params.paletteName = val;
+      if (val === 'custom') {
+        swatchPicker.show();
+      } else {
+        swatchPicker.hide();
+        paletteFn = rgbPalettes[val];
+      }
     });
 
     // Ink mode toggle

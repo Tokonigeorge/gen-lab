@@ -211,10 +211,18 @@
     <div class="control-row">
       <label>palette</label>
       <select id="ctrl-palette">
-        <option value="dark" selected>dark</option>
-        <option value="heat">heat map</option>
-        <option value="blue">blue-white</option>
-        <option value="green">emerald</option>
+        <option value="ice" selected>ice</option>
+        <option value="ember">ember</option>
+        <option value="emerald">emerald</option>
+        <option value="neon">neon</option>
+        <option value="plasma">plasma</option>
+        <option value="ocean">ocean</option>
+        <option value="sunset">sunset</option>
+        <option value="warm">warm</option>
+        <option value="cold">cold</option>
+        <option value="spectrum">spectrum</option>
+        <option value="mono">mono</option>
+        <option value="custom">custom...</option>
       </select>
     </div>
     <div class="control-row">
@@ -244,7 +252,8 @@
   </div>
 
   <script>
-    import { saveCanvasPNG } from '../../shared/canvas.js';
+    import { saveCanvasPNG } from '../shared/canvas.js';
+    import { rgbPalettes, makeCustomPalette, buildSwatchPicker } from '../shared/colors.js';
 
     // -----------------------------------------------------------------------
     // THE GRAY-SCOTT MODEL
@@ -417,7 +426,6 @@
     let params = {
       f: 0.037,
       k: 0.060,
-      palette: 'dark',
       seedMode: 'center',
     };
 
@@ -548,50 +556,16 @@
     // Rendering — map B concentration to color via palette
     // -----------------------------------------------------------------------
 
-    /**
-     * Color palettes. Each maps a B concentration value (0 to 1) to an
-     * RGB triple. B=0 means no pattern (background), B=1 means fully
-     * saturated pattern.
-     */
-    const palettes = {
-      dark(b) {
-        // Black background, bright pattern emerges in cyan-white
-        const v = Math.min(b * 3, 1);
-        return [v * 60, v * 180, v * 220];
-      },
-      heat(b) {
-        // Black → red → orange → yellow → white heat map
-        const t = Math.min(b * 3, 1);
-        if (t < 0.33) {
-          const s = t / 0.33;
-          return [s * 200, 0, 0];
-        } else if (t < 0.66) {
-          const s = (t - 0.33) / 0.33;
-          return [200 + s * 55, s * 150, 0];
-        } else {
-          const s = (t - 0.66) / 0.34;
-          return [255, 150 + s * 105, s * 200];
-        }
-      },
-      blue(b) {
-        // Deep blue background → white pattern
-        const t = Math.min(b * 3, 1);
-        return [t * 220, t * 230, 80 + t * 175];
-      },
-      green(b) {
-        // Dark background → emerald green pattern
-        const t = Math.min(b * 3, 1);
-        return [t * 30, t * 200, t * 100];
-      },
-    };
+    // Color palette — fetched from shared palette system. B concentration
+    // (0 to 1) is scaled and passed to the palette function.
+    let currentPaletteFn = rgbPalettes.ice;
 
     /** Render the current B grid to the offscreen canvas, then scale to viewport */
     function render() {
-      const palette = palettes[params.palette];
-
       for (let i = 0; i < N * N; i++) {
-        const b = B0[i];
-        const [r, g, bl] = palette(b);
+        // Scale B concentration (typically 0–0.35) to the palette's 0–1 range
+        const b = Math.min(B0[i] * 3, 1);
+        const [r, g, bl] = currentPaletteFn(b);
         const p = i * 4;
         pixels[p]     = r;
         pixels[p + 1] = g;
@@ -691,9 +665,21 @@
       killDisplay.classList.toggle('bulge', wide);
     });
 
-    document.getElementById('ctrl-palette').addEventListener('change', (e) => {
-      params.palette = e.target.value;
+    const paletteSelect = document.getElementById('ctrl-palette');
+    const swatchPicker = buildSwatchPicker(paletteSelect, (hex) => {
+      currentPaletteFn = makeCustomPalette(hex);
       render();
+    });
+
+    paletteSelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'custom') {
+        swatchPicker.show();
+      } else {
+        swatchPicker.hide();
+        currentPaletteFn = rgbPalettes[val];
+        render();
+      }
     });
 
     document.getElementById('ctrl-seed-mode').addEventListener('change', (e) => {

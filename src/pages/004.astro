@@ -1,0 +1,866 @@
+---
+/**
+ * Experiment 004: Strange Attractors
+ *
+ * Interactive visualization of strange attractors — dynamical systems that
+ * never repeat but never escape, tracing fractal trajectories through phase
+ * space. We plot the Lorenz, Clifford, Peter de Jong, and Dadras attractors
+ * using density-based rendering (histogram equalization) for rich detail.
+ */
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>004 — Strange Attractors | Generative Lab</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100dvw;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      width: 280px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.3s;
+      overflow: visible;
+    }
+
+    #controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #controls h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-row label {
+      flex-shrink: 0;
+      color: #aaa;
+      min-width: 20px;
+    }
+
+    .control-row input[type="range"] {
+      flex: 1;
+      accent-color: #6a8cff;
+    }
+
+    .control-row .value {
+      text-align: right;
+      color: #6a8cff;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      min-width: 36px;
+      padding: 4px 12px 4px 8px;
+      margin-right: -21px;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      transform: translateX(0);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .control-row .value.bulge {
+      transform: translateX(12px);
+    }
+
+    .control-row select {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: #ccc;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: rgba(255, 255, 255, 0.12); }
+
+    #toggle-ui {
+      position: fixed;
+      top: 16px;
+      right: 312px;
+      z-index: 11;
+      background: rgba(10, 10, 15, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: #888;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #toggle-ui:hover { color: #ccc; }
+
+    #back {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11;
+      color: #555;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #back:hover { color: #aaa; }
+
+    #status {
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+    }
+
+    #param-sliders {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .separator {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      margin: 2px 0;
+    }
+  </style>
+</head>
+<body>
+  <a id="back" href="/">← gallery</a>
+  <button id="toggle-ui">UI</button>
+
+  <div id="canvas-container"></div>
+
+  <div id="controls">
+    <h2>004 — Strange Attractors</h2>
+
+    <div class="control-row">
+      <label>type</label>
+      <select id="ctrl-attractor">
+        <option value="lorenz">Lorenz</option>
+        <option value="clifford" selected>Clifford</option>
+        <option value="dejong">de Jong</option>
+        <option value="dadras">Dadras</option>
+      </select>
+    </div>
+
+    <div id="param-sliders"></div>
+
+    <div class="separator"></div>
+
+    <div class="control-row">
+      <label>palette</label>
+      <select id="ctrl-palette">
+        <option value="ember" selected>ember</option>
+        <option value="ice">ice</option>
+        <option value="neon">neon</option>
+        <option value="plasma">plasma</option>
+        <option value="ocean">ocean</option>
+        <option value="sunset">sunset</option>
+        <option value="emerald">emerald</option>
+        <option value="warm">warm</option>
+        <option value="cold">cold</option>
+        <option value="spectrum">spectrum</option>
+        <option value="mono">mono</option>
+        <option value="custom">custom...</option>
+      </select>
+    </div>
+
+    <div class="button-row">
+      <button class="btn" id="btn-randomize">randomize</button>
+      <button class="btn" id="btn-save">save PNG</button>
+    </div>
+
+    <div id="status">ready</div>
+  </div>
+
+  <script>
+    import { saveCanvasPNG } from '../shared/canvas.js';
+    import { rgbPalettes, makeCustomPalette, buildSwatchPicker } from '../shared/colors.js';
+
+    // -----------------------------------------------------------------------
+    // DYNAMICAL SYSTEMS AND STRANGE ATTRACTORS
+    // -----------------------------------------------------------------------
+    //
+    // A DYNAMICAL SYSTEM is any system whose state evolves over time according
+    // to a fixed rule. The rule can be:
+    //   - A differential equation: dx/dt = f(x)   (continuous time, like Lorenz)
+    //   - An iterated map: x_{n+1} = f(x_n)      (discrete time, like Clifford)
+    //
+    // The set of all possible states is called PHASE SPACE. For a 2D system,
+    // phase space is the x-y plane. For 3D (Lorenz), it's a 3D volume — we
+    // project down to 2D for visualization.
+    //
+    // WHAT IS AN ATTRACTOR?
+    // ---------------------
+    // An attractor is a set of states that nearby trajectories converge toward
+    // over time. Think of it as the system's "long-term behavior." Examples:
+    //   - A fixed point: the system settles to one value (like a pendulum at rest)
+    //   - A limit cycle: the system repeats periodically (like a metronome)
+    //   - A STRANGE attractor: the system never repeats, never settles, yet
+    //     stays bounded in a specific region of phase space. This is chaos.
+    //
+    // WHAT MAKES AN ATTRACTOR "STRANGE"?
+    // ------------------------------------
+    // Two properties define strangeness:
+    //
+    //   1. FRACTAL DIMENSION — the attractor has non-integer dimension. It's
+    //      more than a curve (dimension 1) but less than a surface (dimension 2).
+    //      The Lorenz attractor has dimension ≈ 2.06. If you zoom in, you see
+    //      the same layered structure at every scale — infinitely many thin
+    //      sheets folded over each other.
+    //
+    //   2. SENSITIVE DEPENDENCE ON INITIAL CONDITIONS — two points that start
+    //      arbitrarily close will diverge exponentially fast ("the butterfly
+    //      effect"). This makes long-term prediction impossible even though the
+    //      system is perfectly deterministic. Chaos isn't randomness; it's
+    //      determinism that looks random because tiny errors grow explosively.
+    //
+    // WHY LORENZ DISCOVERED THIS ACCIDENTALLY
+    // -----------------------------------------
+    // In 1963, meteorologist Edward Lorenz was running a simplified weather
+    // model on a computer. He re-entered initial conditions rounded to 3
+    // decimal places instead of 6. The result diverged completely from the
+    // original run. That tiny difference (0.000127) grew into a totally
+    // different weather pattern. This was the first concrete demonstration
+    // of sensitive dependence — and the origin of "the butterfly effect."
+    //
+    // WHY SOME PARAMETERS DIVERGE
+    // ----------------------------
+    // Not all parameter combinations produce bounded attractors. The attractor
+    // exists at a delicate balance: the system must be unstable enough to
+    // never settle (chaos) but constrained enough to never escape. Change
+    // the parameters too much and one of these breaks:
+    //   - Too stable → system converges to a fixed point (boring)
+    //   - Too unstable → trajectories fly off to infinity (divergence)
+    //   - Just right → bounded chaos (the strange attractor)
+    // This is why the "randomize" button uses constrained ranges — it picks
+    // parameters likely to produce interesting bounded behavior.
+
+    // -----------------------------------------------------------------------
+    // Attractor definitions
+    // -----------------------------------------------------------------------
+    //
+    // Each attractor specifies:
+    //   params: array of parameter definitions (name, default, range)
+    //   totalIter: how many points to compute for good density
+    //   transient: how many steps to skip before recording (let the system
+    //              settle onto the attractor before we start plotting)
+    //   init(): initial state
+    //   step(state, params): compute next state
+    //   project(state): map to {x, y} for 2D plotting
+    //   randomize(): generate random parameters likely to be interesting
+    // -----------------------------------------------------------------------
+
+    const ATTRACTORS = {
+      lorenz: {
+        name: 'Lorenz',
+        params: [
+          { key: 'sigma', label: 'σ', default: 10, min: 1, max: 30, step: 0.1 },
+          { key: 'rho',   label: 'ρ', default: 28, min: 10, max: 50, step: 0.1 },
+          { key: 'beta',  label: 'β', default: 2.667, min: 0.1, max: 10, step: 0.01 },
+        ],
+        totalIter: 800000,
+        transient: 2000,
+        batchSize: 50000,
+        init() { return { x: 0.1, y: 0, z: 0 }; },
+
+        // Lorenz system: three coupled ODEs describing simplified atmospheric
+        // convection. σ = Prandtl number (ratio of momentum to thermal diffusivity),
+        // ρ = Rayleigh number (strength of convection driving), β = geometry factor.
+        // The classic chaos parameters are σ=10, ρ=28, β=8/3.
+        step(s, p) {
+          const dt = 0.005;
+          const dx = p.sigma * (s.y - s.x);
+          const dy = s.x * (p.rho - s.z) - s.y;
+          const dz = s.x * s.y - p.beta * s.z;
+          return { x: s.x + dx * dt, y: s.y + dy * dt, z: s.z + dz * dt };
+        },
+
+        // Project 3D → 2D: we use the x-z plane which shows the iconic
+        // butterfly shape (two lobes the trajectory jumps between)
+        project(s) { return { x: s.x, y: s.z }; },
+
+        randomize() {
+          return {
+            sigma: 8 + Math.random() * 8,
+            rho: 22 + Math.random() * 18,
+            beta: 1.5 + Math.random() * 3,
+          };
+        },
+      },
+
+      clifford: {
+        name: 'Clifford',
+        params: [
+          { key: 'a', label: 'a', default: -1.4, min: -3, max: 3, step: 0.01 },
+          { key: 'b', label: 'b', default: 1.6,  min: -3, max: 3, step: 0.01 },
+          { key: 'c', label: 'c', default: 1.0,  min: -3, max: 3, step: 0.01 },
+          { key: 'd', label: 'd', default: 0.7,  min: -3, max: 3, step: 0.01 },
+        ],
+        totalIter: 3000000,
+        transient: 100,
+        batchSize: 100000,
+        init() { return { x: 0.1, y: 0.1 }; },
+
+        // Clifford attractor: a 2D iterated map discovered by Clifford Pickover.
+        // Each iteration applies sin/cos transformations to the coordinates,
+        // creating intricate swirling patterns. The structure comes from the
+        // interplay of the four parameters controlling the sin and cos terms.
+        step(s, p) {
+          return {
+            x: Math.sin(p.a * s.y) + p.c * Math.cos(p.a * s.x),
+            y: Math.sin(p.b * s.x) + p.d * Math.cos(p.b * s.y),
+          };
+        },
+        project(s) { return s; },
+
+        // Most Clifford parameters in [-2, 2] produce bounded attractors.
+        // Values outside this range tend to diverge.
+        randomize() {
+          return {
+            a: -2 + Math.random() * 4,
+            b: -2 + Math.random() * 4,
+            c: -2 + Math.random() * 4,
+            d: -2 + Math.random() * 4,
+          };
+        },
+      },
+
+      dejong: {
+        name: 'de Jong',
+        params: [
+          { key: 'a', label: 'a', default: 1.4,  min: -3, max: 3, step: 0.01 },
+          { key: 'b', label: 'b', default: -2.3, min: -3, max: 3, step: 0.01 },
+          { key: 'c', label: 'c', default: 2.4,  min: -3, max: 3, step: 0.01 },
+          { key: 'd', label: 'd', default: -2.1, min: -3, max: 3, step: 0.01 },
+        ],
+        totalIter: 3000000,
+        transient: 100,
+        batchSize: 100000,
+        init() { return { x: 0.1, y: 0.1 }; },
+
+        // Peter de Jong attractor: similar in spirit to Clifford, but uses
+        // sin - cos instead of sin + cos. This produces a different family
+        // of shapes — often more open, feathery, or flame-like structures.
+        step(s, p) {
+          return {
+            x: Math.sin(p.a * s.y) - Math.cos(p.b * s.x),
+            y: Math.sin(p.c * s.x) - Math.cos(p.d * s.y),
+          };
+        },
+        project(s) { return s; },
+
+        // de Jong attractors are bounded for most parameters in [-3, 3]
+        // since sin and cos are bounded to [-1, 1], making the output
+        // always in [-2, 2] regardless of parameters.
+        randomize() {
+          return {
+            a: -3 + Math.random() * 6,
+            b: -3 + Math.random() * 6,
+            c: -3 + Math.random() * 6,
+            d: -3 + Math.random() * 6,
+          };
+        },
+      },
+
+      dadras: {
+        name: 'Dadras',
+        params: [
+          { key: 'a', label: 'a', default: 3,   min: 1, max: 5, step: 0.01 },
+          { key: 'b', label: 'b', default: 2.7, min: 1, max: 4, step: 0.01 },
+          { key: 'c', label: 'c', default: 1.7, min: 0.5, max: 3, step: 0.01 },
+          { key: 'd', label: 'd', default: 2,   min: 1, max: 4, step: 0.01 },
+        ],
+        totalIter: 800000,
+        transient: 2000,
+        batchSize: 50000,
+        init() { return { x: 1, y: 1, z: 1 }; },
+
+        // Dadras-Momeni attractor: a 3D continuous system discovered in 2010.
+        // dx/dt = y - a·x + b·y·z
+        // dy/dt = c·y - x·z + z
+        // dz/dt = d·x·y - e·z
+        // We fix e=9 (z-axis damping) and expose a, b, c, d as controls.
+        // Produces swirling, multi-lobed shapes reminiscent of twisted ribbons.
+        step(s, p) {
+          const e = 9;
+          const dt = 0.002;
+          const dx = s.y - p.a * s.x + p.b * s.y * s.z;
+          const dy = p.c * s.y - s.x * s.z + s.z;
+          const dz = p.d * s.x * s.y - e * s.z;
+          return { x: s.x + dx * dt, y: s.y + dy * dt, z: s.z + dz * dt };
+        },
+
+        // Project 3D → 2D via x-y plane
+        project(s) { return { x: s.x, y: s.y }; },
+
+        randomize() {
+          return {
+            a: 2 + Math.random() * 2,
+            b: 2 + Math.random() * 1.5,
+            c: 1 + Math.random() * 1.5,
+            d: 1.5 + Math.random() * 1.5,
+          };
+        },
+      },
+    };
+
+    // -----------------------------------------------------------------------
+    // Canvas setup
+    // -----------------------------------------------------------------------
+    const container = document.getElementById('canvas-container');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'display:block;width:100%;height:100%;';
+    container.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    let W = 0, H = 0;
+
+    function resize() {
+      W = container.clientWidth;
+      H = container.clientHeight;
+      canvas.width = W;
+      canvas.height = H;
+    }
+
+    resize();
+
+    // Color palette — fetched from shared palette system
+    let currentPaletteFn = rgbPalettes.ember;
+
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    let currentType = 'clifford';
+    let currentParams = {};
+
+    // Hit buffer — counts how many times each pixel has been visited.
+    // This is the raw data that histogram equalization converts to brightness.
+    let hits = null;
+    let imageData = null;
+    let pixels = null;
+
+    // Computation state
+    let state = null;
+    let iterCount = 0;
+    let computeId = null;
+    let bounds = null; // { xMin, xMax, yMin, yMax }
+
+    // -----------------------------------------------------------------------
+    // Bounds computation
+    // -----------------------------------------------------------------------
+    //
+    // Before plotting, we need to know the attractor's extent in phase space
+    // so we can map coordinates to pixels. We do a quick preliminary pass:
+    // iterate a few thousand points to estimate the bounding box, then add
+    // padding so the attractor doesn't touch the canvas edges.
+    // -----------------------------------------------------------------------
+
+    function computeBounds(attrDef, params) {
+      let s = attrDef.init();
+      let xMin = Infinity, xMax = -Infinity;
+      let yMin = Infinity, yMax = -Infinity;
+
+      // Skip transient — the initial trajectory may be far from the attractor
+      for (let i = 0; i < attrDef.transient; i++) {
+        s = attrDef.step(s, params);
+        // Check for divergence
+        if (!isFinite(s.x) || !isFinite(s.y) || (s.z !== undefined && !isFinite(s.z))) {
+          return null; // parameters produce divergent trajectory
+        }
+      }
+
+      // Sample the attractor to find bounds
+      const sampleSize = 20000;
+      for (let i = 0; i < sampleSize; i++) {
+        s = attrDef.step(s, params);
+        if (!isFinite(s.x) || !isFinite(s.y) || (s.z !== undefined && !isFinite(s.z))) {
+          return null;
+        }
+        const p = attrDef.project(s);
+        if (p.x < xMin) xMin = p.x;
+        if (p.x > xMax) xMax = p.x;
+        if (p.y < yMin) yMin = p.y;
+        if (p.y > yMax) yMax = p.y;
+      }
+
+      // Add 10% padding and make the viewport square (preserves aspect ratio)
+      const dx = (xMax - xMin) * 0.1 || 1;
+      const dy = (yMax - yMin) * 0.1 || 1;
+      xMin -= dx; xMax += dx;
+      yMin -= dy; yMax += dy;
+
+      // Make viewport aspect ratio match canvas aspect ratio
+      const bw = xMax - xMin;
+      const bh = yMax - yMin;
+      const canvasAspect = W / H;
+      const boundsAspect = bw / bh;
+
+      if (boundsAspect > canvasAspect) {
+        // Bounds are wider — expand height
+        const newH = bw / canvasAspect;
+        const extra = (newH - bh) / 2;
+        yMin -= extra;
+        yMax += extra;
+      } else {
+        // Bounds are taller — expand width
+        const newW = bh * canvasAspect;
+        const extra = (newW - bw) / 2;
+        xMin -= extra;
+        xMax += extra;
+      }
+
+      return { xMin, xMax, yMin, yMax, state: s };
+    }
+
+    // -----------------------------------------------------------------------
+    // Main computation — iterate the attractor in batches
+    // -----------------------------------------------------------------------
+
+    function startComputation() {
+      // Cancel any running computation
+      if (computeId !== null) {
+        cancelAnimationFrame(computeId);
+        computeId = null;
+      }
+
+      const attrDef = ATTRACTORS[currentType];
+      const status = document.getElementById('status');
+
+      // Compute bounds from a quick preliminary pass
+      bounds = computeBounds(attrDef, currentParams);
+      if (!bounds) {
+        status.textContent = 'divergent — try different parameters';
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, W, H);
+        return;
+      }
+
+      // Reset hit buffer
+      hits = new Uint32Array(W * H);
+      imageData = ctx.createImageData(W, H);
+      pixels = imageData.data;
+
+      // Resume from the state after bounds computation (already past transient)
+      state = bounds.state;
+      iterCount = 0;
+
+      status.textContent = 'iterating…';
+
+      function frame() {
+        const batchSize = attrDef.batchSize;
+        const total = attrDef.totalIter;
+        const { xMin, xMax, yMin, yMax } = bounds;
+        const scaleX = (W - 1) / (xMax - xMin);
+        const scaleY = (H - 1) / (yMax - yMin);
+
+        for (let i = 0; i < batchSize; i++) {
+          state = attrDef.step(state, currentParams);
+
+          // Check for divergence mid-computation
+          if (!isFinite(state.x) || !isFinite(state.y) ||
+              (state.z !== undefined && !isFinite(state.z))) {
+            status.textContent = 'diverged — try different parameters';
+            renderHits();
+            return;
+          }
+
+          const p = attrDef.project(state);
+
+          // Map from attractor coordinates to pixel coordinates
+          const px = Math.floor((p.x - xMin) * scaleX);
+          const py = Math.floor((p.y - yMin) * scaleY);
+
+          // Increment hit count (bounds check for safety)
+          if (px >= 0 && px < W && py >= 0 && py < H) {
+            hits[py * W + px]++;
+          }
+
+          iterCount++;
+        }
+
+        renderHits();
+
+        const pct = Math.min(100, Math.round((iterCount / total) * 100));
+        status.textContent = `iterating… ${pct}% · ${(iterCount / 1e6).toFixed(1)}M points`;
+
+        if (iterCount < total) {
+          computeId = requestAnimationFrame(frame);
+        } else {
+          computeId = null;
+          status.textContent = `${(iterCount / 1e6).toFixed(1)}M points · done`;
+        }
+      }
+
+      computeId = requestAnimationFrame(frame);
+    }
+
+    // -----------------------------------------------------------------------
+    // Rendering — histogram equalization via log scaling
+    // -----------------------------------------------------------------------
+    //
+    // WHAT IS HISTOGRAM EQUALIZATION AND WHY IS IT NEEDED?
+    // ----------------------------------------------------
+    //
+    // Raw hit counts are extremely uneven. Most pixels get 0 or 1 hits (the
+    // attractor's outer wisps), while a few pixels at the attractor's densest
+    // points get thousands. If we mapped count linearly to brightness:
+    //
+    //   brightness = count / maxCount
+    //
+    // then 99% of pixels would appear nearly black because their count is
+    // negligible compared to the maximum. The attractor would be invisible
+    // except for a few bright dots.
+    //
+    // LOG SCALING fixes this by compressing the dynamic range:
+    //
+    //   brightness = log(1 + count) / log(1 + maxCount)
+    //
+    // This maps:
+    //   count = 0    → brightness = 0          (still black)
+    //   count = 1    → brightness ≈ 0.15       (faintly visible)
+    //   count = 10   → brightness ≈ 0.35       (clearly visible)
+    //   count = 1000 → brightness ≈ 0.75       (bright)
+    //   count = max  → brightness = 1.0        (maximum)
+    //
+    // The logarithm's concave shape "lifts" the low values while compressing
+    // the high values, revealing the full structure of the attractor — the
+    // delicate outer filaments and the dense core are both visible.
+    //
+    // This is a simplified form of histogram equalization. True histogram
+    // equalization would compute the CDF of the hit distribution, but log
+    // scaling produces very similar results and is much simpler to compute.
+    // -----------------------------------------------------------------------
+
+    function renderHits() {
+      const palette = currentPaletteFn;
+
+      // Find the maximum hit count for normalization
+      let maxHit = 0;
+      for (let i = 0; i < hits.length; i++) {
+        if (hits[i] > maxHit) maxHit = hits[i];
+      }
+
+      if (maxHit === 0) {
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, W, H);
+        return;
+      }
+
+      const logMax = Math.log(1 + maxHit);
+
+      for (let i = 0; i < hits.length; i++) {
+        const count = hits[i];
+        const p = i * 4;
+
+        if (count === 0) {
+          // Background
+          pixels[p]     = 10;
+          pixels[p + 1] = 10;
+          pixels[p + 2] = 15;
+          pixels[p + 3] = 255;
+        } else {
+          // Log-scaled brightness
+          const t = Math.log(1 + count) / logMax;
+          const [r, g, b] = palette(t);
+          pixels[p]     = r;
+          pixels[p + 1] = g;
+          pixels[p + 2] = b;
+          pixels[p + 3] = 255;
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Dynamic parameter slider UI
+    // -----------------------------------------------------------------------
+    //
+    // Each attractor has different parameters with different names and ranges.
+    // When the attractor type changes, we rebuild the slider UI to match.
+    // -----------------------------------------------------------------------
+
+    function buildParamSliders() {
+      const attrDef = ATTRACTORS[currentType];
+      const container = document.getElementById('param-sliders');
+      container.innerHTML = '';
+
+      // Initialize currentParams from defaults
+      currentParams = {};
+      for (const p of attrDef.params) {
+        currentParams[p.key] = p.default;
+      }
+
+      for (const p of attrDef.params) {
+        const row = document.createElement('div');
+        row.className = 'control-row';
+
+        const label = document.createElement('label');
+        label.textContent = p.label;
+        row.appendChild(label);
+
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = p.min;
+        input.max = p.max;
+        input.step = p.step;
+        input.value = p.default;
+        row.appendChild(input);
+
+        const display = document.createElement('span');
+        display.className = 'value';
+        display.textContent = formatParam(p.default, p.step);
+        row.appendChild(display);
+
+        input.addEventListener('input', () => {
+          const val = parseFloat(input.value);
+          currentParams[p.key] = val;
+          display.textContent = formatParam(val, p.step);
+          const wide = display.textContent.length >= 5;
+          display.classList.toggle('bulge', wide);
+          // Restart computation with new parameters
+          startComputation();
+        });
+
+        container.appendChild(row);
+      }
+    }
+
+    function formatParam(value, step) {
+      if (step >= 1) return String(Math.round(value));
+      if (step >= 0.1) return value.toFixed(1);
+      if (step >= 0.01) return value.toFixed(2);
+      return value.toFixed(3);
+    }
+
+    // -----------------------------------------------------------------------
+    // Controls
+    // -----------------------------------------------------------------------
+
+    document.getElementById('ctrl-attractor').addEventListener('change', (e) => {
+      currentType = e.target.value;
+      buildParamSliders();
+      startComputation();
+    });
+
+    const paletteSelect = document.getElementById('ctrl-palette');
+    const swatchPicker = buildSwatchPicker(paletteSelect, (hex) => {
+      currentPaletteFn = makeCustomPalette(hex);
+      if (hits) renderHits();
+    });
+
+    paletteSelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'custom') {
+        swatchPicker.show();
+      } else {
+        swatchPicker.hide();
+        currentPaletteFn = rgbPalettes[val];
+        if (hits) renderHits();
+      }
+    });
+
+    document.getElementById('btn-randomize').addEventListener('click', () => {
+      const attrDef = ATTRACTORS[currentType];
+      const randomParams = attrDef.randomize();
+
+      // Update currentParams and sync slider UI
+      currentParams = randomParams;
+      const sliderContainer = document.getElementById('param-sliders');
+      const rows = sliderContainer.querySelectorAll('.control-row');
+
+      attrDef.params.forEach((p, i) => {
+        const input = rows[i].querySelector('input');
+        const display = rows[i].querySelector('.value');
+        const val = randomParams[p.key];
+        input.value = val;
+        display.textContent = formatParam(val, p.step);
+        const wide = display.textContent.length >= 5;
+        display.classList.toggle('bulge', wide);
+      });
+
+      startComputation();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      saveCanvasPNG(canvas, `attractor-${currentType}.png`);
+    });
+
+    document.getElementById('toggle-ui').addEventListener('click', () => {
+      document.getElementById('controls').classList.toggle('hidden');
+    });
+
+    window.addEventListener('resize', () => {
+      resize();
+      startComputation();
+    });
+
+    // -----------------------------------------------------------------------
+    // Go
+    // -----------------------------------------------------------------------
+    buildParamSliders();
+    startComputation();
+  </script>
+</body>
+</html>

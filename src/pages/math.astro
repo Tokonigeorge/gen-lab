@@ -847,6 +847,99 @@ Apply the quadratic formula:
     </details>
 
     <!-- ============================================================ -->
+    <!-- EXPERIMENT 004: STRANGE ATTRACTORS -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 14px; color: #6a8cff; letter-spacing: 0.06em; text-transform: uppercase; margin: 32px 0 16px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06);">Experiment 004: Strange Attractors</h2>
+
+    <details open>
+      <summary><span class="num">15</span> Dynamical Systems and Phase Space</summary>
+      <div class="section-body">
+        <p>A <strong>dynamical system</strong> is any system whose state evolves over time according to a fixed rule. The rule can be a differential equation (continuous time, like Lorenz) or an iterated map (discrete time, like Clifford).</p>
+        <p><strong>Phase space</strong> is the set of all possible states. For a 2D system it's a plane; for 3D it's a volume. A trajectory in phase space shows the system's entire history as a single curve.</p>
+        <p>An <strong>attractor</strong> is a set in phase space that nearby trajectories converge toward — the system's long-term behavior. A <strong>fixed point</strong> (pendulum at rest), <strong>limit cycle</strong> (metronome), or <strong>strange attractor</strong> (chaos) are all attractors.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> Phase space is like a landscape. Attractors are the valleys — wherever you start on the hillside, you eventually roll down into one. A strange attractor is a valley with infinitely complex terrain: you keep rolling but never reach the bottom, tracing a path that never repeats.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">16</span> What Makes an Attractor "Strange"</summary>
+      <div class="section-body">
+        <p>Two properties define "strange":</p>
+        <p><strong>1. Fractal dimension.</strong> The attractor has non-integer dimension. The Lorenz attractor is ≈ 2.06 — more than a curve (1D) but less than a surface (2D). Zoom in and you see infinitely many thin sheets folded over each other, self-similar at every scale.</p>
+        <p><strong>2. Sensitive dependence on initial conditions.</strong> Two points starting arbitrarily close diverge exponentially fast — the "butterfly effect." The system is perfectly deterministic, but tiny measurement errors grow so fast that long-term prediction becomes impossible.</p>
+        <pre>Two nearby trajectories:
+
+Time 0:    ●● (start close)
+Time 10:   ●      ● (diverging)
+Time 20:   ●                ● (completely different)
+
+Yet both stay on the same attractor forever.</pre>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Pick the Lorenz attractor and nudge σ by 0.01. The shape looks similar, but if you could track individual trajectories, they'd be completely different after a few seconds.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">17</span> The Lorenz Attractor and the Weather</summary>
+      <div class="section-body">
+        <p>In 1963, meteorologist Edward Lorenz was running a simplified weather model — three coupled ODEs describing atmospheric convection:</p>
+        <pre>dx/dt = σ(y - x)          σ = Prandtl number
+dy/dt = x(ρ - z) - y      ρ = Rayleigh number
+dz/dt = xy - βz            β = geometry factor</pre>
+        <p>He re-entered initial conditions rounded from 6 decimal places to 3. The result diverged completely — a difference of 0.000127 grew into a totally different weather pattern. This was the first concrete demonstration of sensitive dependence.</p>
+        <p>The classic parameters (σ=10, ρ=28, β=8/3) produce the iconic butterfly shape: two lobes that the trajectory jumps between unpredictably. The x-z projection reveals this structure.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> Imagine a ball on a figure-8 shaped track with a bump at the crossing. Each time it reaches the crossing, tiny differences in speed determine which loop it takes next. The sequence of choices (left, right, left, left, right...) never repeats and is essentially unpredictable.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">18</span> Iterated Map Attractors</summary>
+      <div class="section-body">
+        <p>Not all dynamical systems use differential equations. <strong>Iterated maps</strong> apply a function repeatedly — the Clifford and de Jong attractors are 2D maps with four parameters each:</p>
+        <pre>Clifford:  x' = sin(a·y) + c·cos(a·x)
+           y' = sin(b·x) + d·cos(b·y)
+
+de Jong:   x' = sin(a·y) - cos(b·x)
+           y' = sin(c·x) - cos(d·y)</pre>
+        <p>Since sin and cos are bounded to [-1, 1], these maps always produce bounded output — no divergence risk. The four parameters control the frequency and phase of sinusoidal distortions, creating swirling, feathery, or flame-like structures.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Click "randomize" repeatedly on the Clifford attractor. Each random parameter set creates a completely different shape — some swooping and organic, others tight and geometric. The variety from just four numbers is remarkable.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">19</span> Density Rendering and Histogram Equalization</summary>
+      <div class="section-body">
+        <p>We render attractors by iterating millions of points and counting pixel visits. But raw hit counts are extremely skewed:</p>
+        <pre>Most pixels:   0–1 hits    (outer wisps)
+Some pixels:   10–100      (main structure)
+A few pixels:  1000+       (dense core)</pre>
+        <p>Linear brightness mapping (count/max) makes 99% of pixels nearly black. <strong>Log scaling</strong> compresses the dynamic range:</p>
+        <pre>brightness = log(1 + count) / log(1 + max)
+
+count = 0     → 0       (black)
+count = 1     → 0.15    (faintly visible)
+count = 100   → 0.50    (visible)
+count = max   → 1.0     (bright)</pre>
+        <p>The logarithm lifts low values and compresses high values, revealing both delicate outer filaments and the dense core simultaneously.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> It's like HDR photography. A raw photo of the night sky is either black (stars invisible) or blown out (bright stars as white blobs). HDR compresses the range so you see faint nebulae and bright stars in the same image.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
     <!-- GLOSSARY -->
     <!-- ============================================================ -->
     <details>
@@ -874,6 +967,14 @@ Apply the quadratic formula:
           <tr><td><strong>Laplacian (∇²)</strong></td><td>Measures how much a value deviates from its local average</td></tr>
           <tr><td><strong>Autocatalytic</strong></td><td>A reaction where the product promotes its own formation</td></tr>
           <tr><td><strong>Ping-pong buffers</strong></td><td>Two alternating arrays so reads and writes don't mix in one step</td></tr>
+          <tr><td><strong>Dynamical system</strong></td><td>A system whose state evolves over time by a fixed rule</td></tr>
+          <tr><td><strong>Phase space</strong></td><td>The space of all possible states of a system</td></tr>
+          <tr><td><strong>Attractor</strong></td><td>A set that nearby trajectories converge toward over time</td></tr>
+          <tr><td><strong>Strange attractor</strong></td><td>Attractor with fractal dimension and sensitive dependence (chaos)</td></tr>
+          <tr><td><strong>Butterfly effect</strong></td><td>Tiny initial differences grow exponentially — deterministic unpredictability</td></tr>
+          <tr><td><strong>Fractal dimension</strong></td><td>Non-integer dimension — a curve that's "more than 1D but less than 2D"</td></tr>
+          <tr><td><strong>Iterated map</strong></td><td>A dynamical system where each step is a function of the current state</td></tr>
+          <tr><td><strong>Histogram equalization</strong></td><td>Remapping pixel values to reveal hidden structure in uneven data</td></tr>
         </table>
       </div>
     </details>
@@ -896,6 +997,9 @@ Apply the quadratic formula:
           <li><a href="https://royalsocietypublishing.org/doi/10.1098/rstb.1952.0012">Alan Turing, "The Chemical Basis of Morphogenesis" (1952)</a> — the founding paper on pattern formation</li>
           <li><a href="https://www.science.org/doi/10.1126/science.261.5118.993">J.E. Pearson, "Complex Patterns in a Simple System" (1993)</a> — mapped the full Gray-Scott parameter space</li>
           <li><a href="https://mrob.com/pub/comp/xmorphia/">Robert Munafo, Gray-Scott Explorer</a> — interactive parameter space with labeled regions</li>
+          <li><a href="https://journals.ametsoc.org/view/journals/atsc/20/2/1520-0469_1963_020_0130_dnf_2_0_co_2.xml">Edward Lorenz, "Deterministic Nonperiodic Flow" (1963)</a> — the founding paper on chaos</li>
+          <li><a href="https://sprott.physics.wisc.edu/fractals.htm">Julien C. Sprott, Strange Attractor Gallery</a> — thousands of attractors with parameters</li>
+          <li><a href="https://en.wikipedia.org/wiki/Clifford_A._Pickover">Clifford Pickover</a> — originator of the Clifford attractor family</li>
         </ul>
       </div>
     </details>
