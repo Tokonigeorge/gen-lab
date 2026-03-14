@@ -345,7 +345,7 @@
       const distinct = params.distinct;
       // When distinct mode is on, track seen eigenvalues to skip duplicates
       const seen = distinct ? new Set() : null;
-      const PRECISION = 1e6;
+      const PRECISION = 1e4;
 
       function frame() {
         const end = Math.min(cursor + BATCH_SIZE, totalMatrices);

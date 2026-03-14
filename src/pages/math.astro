@@ -760,6 +760,93 @@ Apply the quadratic formula:
     </details>
 
     <!-- ============================================================ -->
+    <!-- EXPERIMENT 003: REACTION-DIFFUSION -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 14px; color: #6a8cff; letter-spacing: 0.06em; text-transform: uppercase; margin: 32px 0 16px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06);">Experiment 003: Reaction-Diffusion</h2>
+
+    <details open>
+      <summary><span class="num">11</span> The Gray-Scott Model</summary>
+      <div class="section-body">
+        <p>Two chemicals, A (substrate) and B (catalyst), react and diffuse on a 2D grid:</p>
+        <pre>∂A/∂t = Da · ∇²A  -  A·B²  +  f·(1 - A)
+∂B/∂t = Db · ∇²B  +  A·B²  -  (k + f)·B</pre>
+        <p><strong>Da · ∇²A</strong> — Diffusion of A. The Laplacian ∇² measures how much A at a cell deviates from its neighbors. Concentration flows from high to low, like dye in water.</p>
+        <p><strong>A · B²</strong> — Autocatalytic reaction. B catalyzes its own production (B² is the key — positive feedback). This consumes A and produces B.</p>
+        <p><strong>f · (1 - A)</strong> — Feed. Fresh A is continuously supplied at rate f. Acts like a nutrient drip.</p>
+        <p><strong>(k + f) · B</strong> — Kill. B decays at rate k and is diluted by incoming feed.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> Think of A as grass and B as fire. Fire consumes grass (A·B²), grass regrows (feed), fire dies out on its own (kill). The pattern depends on how fast grass regrows vs how fast fire spreads.
+        </div>
+
+        <p>The critical asymmetry: Da = 1.0, Db = 0.5. A diffuses twice as fast as B. Without this difference, no patterns form.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">12</span> Turing Instability — Why Patterns Self-Organize</summary>
+      <div class="section-body">
+        <p>In 1952, Alan Turing published "The Chemical Basis of Morphogenesis," proposing that biological patterns — zebra stripes, leopard spots, the arrangement of fingers — could arise from chemistry alone, with no blueprint.</p>
+        <p>The key insight: <strong>diffusion-driven instability</strong>. Normally diffusion smooths things out. But when a fast-diffusing inhibitor interacts with a slow-diffusing activator, diffusion can <em>amplify</em> perturbations:</p>
+        <pre>1. A tiny excess of B appears at some point
+2. B reacts with local A, consuming it  (A·B² reaction)
+3. A diffuses back in quickly  (Da &gt; Db)
+4. But B stays concentrated  (it diffuses slowly)
+5. The incoming A feeds B's autocatalytic growth
+6. A-depleted zone around B prevents new clusters nearby
+7. Result: regularly spaced B clusters</pre>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> Imagine a city where restaurants (B) consume customers (A). Customers travel fast (cars), restaurants don't move. A new restaurant attracts customers from far away, depleting nearby areas. This "moat" of depleted customers prevents another restaurant from surviving too close — creating naturally spaced clusters.
+        </div>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Start with the "spots" preset and watch individual dots split into two — this is the self-replication mechanism. Then switch to "maze" and watch the spots elongate into stripes that fill the domain.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">13</span> The f/k Parameter Space</summary>
+      <div class="section-body">
+        <p>The Gray-Scott model's behavior is exquisitely sensitive to f (feed) and k (kill). Small changes cross <strong>bifurcations</strong> — critical boundaries between qualitatively different patterns.</p>
+        <table>
+          <tr><th>Pattern</th><th>f</th><th>k</th><th>Description</th></tr>
+          <tr><td>Spots</td><td>0.037</td><td>0.060</td><td>Isolated dots that split and self-replicate</td></tr>
+          <tr><td>Maze</td><td>0.029</td><td>0.057</td><td>Labyrinthine stripes filling the domain</td></tr>
+          <tr><td>Worms</td><td>0.054</td><td>0.063</td><td>Short, wriggling filaments</td></tr>
+          <tr><td>Holes</td><td>0.039</td><td>0.058</td><td>B fills space; A survives in scattered holes</td></tr>
+          <tr><td>Coral</td><td>0.059</td><td>0.063</td><td>Branching, coral-like growth fronts</td></tr>
+        </table>
+        <p>Why such sensitivity? Near the bifurcation boundary, tiny shifts in f or k determine whether B spots split, merge, elongate into stripes, or die. Karl Pearson mapped the full parameter space in 1993, identifying at least 12 distinct pattern types.</p>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Start at "spots" (f=0.037, k=0.060) and slowly increase k using the slider. Watch the spots thin, then struggle, then vanish entirely. You're crossing the bifurcation.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">14</span> The Laplacian and Discrete Approximation</summary>
+      <div class="section-body">
+        <p>The Laplacian ∇²u measures how much u at a point deviates from its local average:</p>
+        <pre>∇²u &gt; 0 → local minimum (valley) → concentration flows IN
+∇²u &lt; 0 → local maximum (hill)   → concentration flows OUT
+∇²u = 0 → matches neighbors      → no net flow</pre>
+        <p>On a discrete grid, we approximate it with a 9-point weighted stencil:</p>
+        <pre>     0.05  0.2  0.05
+     0.2   -1   0.2
+     0.05  0.2  0.05</pre>
+        <p>The weights sum to zero (0.05×4 + 0.2×4 - 1 = 0). This is required: a uniform field must have ∇² = 0.</p>
+        <p>Cardinal neighbors (weight 0.2) contribute more than diagonals (0.05) because they're closer. This produces smoother, more isotropic diffusion than a simpler 4-point cross stencil.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> The Laplacian at each cell asks: "Am I hotter or cooler than my neighbors?" If hotter (local max), heat flows out. If cooler (local min), heat flows in. Over time, everything equalizes — that's pure diffusion. The reaction terms fight this smoothing, creating pattern.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
     <!-- GLOSSARY -->
     <!-- ============================================================ -->
     <details>
@@ -781,6 +868,12 @@ Apply the quadratic formula:
           <tr><td><strong>Complex plane</strong></td><td>2D plane: real part → x, imaginary part → y</td></tr>
           <tr><td><strong>Bohemian matrix</strong></td><td>Matrix with entries from a fixed finite set of integers</td></tr>
           <tr><td><strong>Conjugate pair</strong></td><td>a+bi and a-bi — always appear together for real matrices</td></tr>
+          <tr><td><strong>Reaction-diffusion</strong></td><td>System where chemicals react locally and diffuse spatially, producing patterns</td></tr>
+          <tr><td><strong>Gray-Scott model</strong></td><td>Two-chemical system with feed (f) and kill (k) parameters</td></tr>
+          <tr><td><strong>Turing instability</strong></td><td>Fast inhibitor + slow activator → spontaneous pattern formation</td></tr>
+          <tr><td><strong>Laplacian (∇²)</strong></td><td>Measures how much a value deviates from its local average</td></tr>
+          <tr><td><strong>Autocatalytic</strong></td><td>A reaction where the product promotes its own formation</td></tr>
+          <tr><td><strong>Ping-pong buffers</strong></td><td>Two alternating arrays so reads and writes don't mix in one step</td></tr>
         </table>
       </div>
     </details>
@@ -800,6 +893,9 @@ Apply the quadratic formula:
           <li><a href="https://natureofcode.com/">Daniel Shiffman, The Nature of Code</a> — excellent intro to simulation and noise</li>
           <li><a href="http://www.bohemianmatrices.com/">bohemianmatrices.com</a> — the definitive Bohemian matrix gallery</li>
           <li><a href="https://www.youtube.com/watch?v=PFDu9oVAE1g">3Blue1Brown, "Eigenvectors and eigenvalues"</a> — the best visual introduction</li>
+          <li><a href="https://royalsocietypublishing.org/doi/10.1098/rstb.1952.0012">Alan Turing, "The Chemical Basis of Morphogenesis" (1952)</a> — the founding paper on pattern formation</li>
+          <li><a href="https://www.science.org/doi/10.1126/science.261.5118.993">J.E. Pearson, "Complex Patterns in a Simple System" (1993)</a> — mapped the full Gray-Scott parameter space</li>
+          <li><a href="https://mrob.com/pub/comp/xmorphia/">Robert Munafo, Gray-Scott Explorer</a> — interactive parameter space with labeled regions</li>
         </ul>
       </div>
     </details>

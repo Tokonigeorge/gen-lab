@@ -1,0 +1,746 @@
+---
+/**
+ * Experiment 003: Reaction-Diffusion (Gray-Scott Model)
+ *
+ * An interactive simulation of two virtual chemicals (A and B) that diffuse
+ * and react on a 2D grid. The emergent patterns — spots, stripes, mazes,
+ * worms, coral — are controlled by just two parameters: feed rate (f) and
+ * kill rate (k).
+ *
+ * Alan Turing proposed this class of system in 1952 ("The Chemical Basis of
+ * Morphogenesis") to explain how biological patterns (zebra stripes, leopard
+ * spots, fingerprints) could arise from simple chemistry. The Gray-Scott
+ * model is a specific two-chemical system that reproduces a rich zoo of
+ * pattern types depending on f and k.
+ */
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>003 — Reaction-Diffusion | Generative Lab</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100dvw;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      width: 270px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.3s;
+      overflow: visible;
+    }
+
+    #controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #controls h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-row label {
+      flex-shrink: 0;
+      color: #aaa;
+    }
+
+    .control-row input[type="range"] {
+      flex: 1;
+      accent-color: #6a8cff;
+    }
+
+    .control-row .value {
+      text-align: right;
+      color: #6a8cff;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      min-width: 36px;
+      padding: 4px 12px 4px 8px;
+      margin-right: -21px;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      transform: translateX(0);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .control-row .value.bulge {
+      transform: translateX(12px);
+    }
+
+    .control-row select {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: #ccc;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: rgba(255, 255, 255, 0.12); }
+    .btn.active { background: rgba(106, 140, 255, 0.25); border-color: #6a8cff; color: #6a8cff; }
+
+    .preset-row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .preset-row .btn {
+      font-size: 10px;
+      padding: 4px 8px;
+    }
+
+    #toggle-ui {
+      position: fixed;
+      top: 16px;
+      right: 298px;
+      z-index: 11;
+      background: rgba(10, 10, 15, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: #888;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #toggle-ui:hover { color: #ccc; }
+
+    #back {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11;
+      color: #555;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #back:hover { color: #aaa; }
+
+    #status {
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <a id="back" href="/">← gallery</a>
+  <button id="toggle-ui">UI</button>
+
+  <div id="canvas-container"></div>
+
+  <div id="controls">
+    <h2>003 — Reaction-Diffusion</h2>
+
+    <div class="control-row">
+      <label>feed (f)</label>
+      <input type="range" id="ctrl-feed" min="0.010" max="0.080" step="0.001" value="0.037" />
+      <span class="value" id="val-feed">0.037</span>
+    </div>
+    <div class="control-row">
+      <label>kill (k)</label>
+      <input type="range" id="ctrl-kill" min="0.045" max="0.070" step="0.001" value="0.060" />
+      <span class="value" id="val-kill">0.060</span>
+    </div>
+    <div class="control-row">
+      <label>palette</label>
+      <select id="ctrl-palette">
+        <option value="dark" selected>dark</option>
+        <option value="heat">heat map</option>
+        <option value="blue">blue-white</option>
+        <option value="green">emerald</option>
+      </select>
+    </div>
+    <div class="control-row">
+      <label>seed</label>
+      <select id="ctrl-seed-mode">
+        <option value="center" selected>center square</option>
+        <option value="random">random seeds</option>
+      </select>
+    </div>
+
+    <div style="color: #666; font-size: 10px; text-align: center;">presets</div>
+    <div class="preset-row">
+      <button class="btn" data-f="0.037" data-k="0.060">spots</button>
+      <button class="btn" data-f="0.029" data-k="0.057">maze</button>
+      <button class="btn" data-f="0.054" data-k="0.063">worms</button>
+      <button class="btn" data-f="0.039" data-k="0.058">holes</button>
+      <button class="btn" data-f="0.059" data-k="0.063">coral</button>
+    </div>
+
+    <div class="button-row">
+      <button class="btn" id="btn-pause">pause</button>
+      <button class="btn" id="btn-reset">reset</button>
+      <button class="btn" id="btn-save">save PNG</button>
+    </div>
+
+    <div id="status">ready</div>
+  </div>
+
+  <script>
+    import { saveCanvasPNG } from '../../shared/canvas.js';
+
+    // -----------------------------------------------------------------------
+    // THE GRAY-SCOTT MODEL
+    // -----------------------------------------------------------------------
+    //
+    // Two chemicals, A and B, react and diffuse on a 2D grid. The update
+    // equations per cell per time step:
+    //
+    //   A' = A + (Da · ∇²A  -  A·B²  +  f·(1 - A)) · dt
+    //   B' = B + (Db · ∇²B  +  A·B²  -  (k + f)·B) · dt
+    //
+    // What each term means:
+    //
+    //   Da · ∇²A  — Diffusion of A. The Laplacian ∇²A measures how much A
+    //               at this cell differs from its neighbors. If neighbors
+    //               have more A, this term is positive (A flows in). If this
+    //               cell has more, it's negative (A flows out). Da controls
+    //               how fast A spreads. Think of dropping dye in water: it
+    //               spreads from high concentration to low.
+    //
+    //   A·B²      — The reaction term. A is consumed and B is produced in
+    //               proportion to A × B². This is an autocatalytic reaction:
+    //               B catalyzes its own production (the B² term), creating a
+    //               positive feedback loop. More B → faster conversion of
+    //               A into B → even more B. This is the engine of pattern
+    //               formation.
+    //
+    //   f·(1 - A) — Feed term. Fresh A is continuously added at rate f.
+    //               When A is low (near 0), feed ≈ f (strong replenishment).
+    //               When A is near 1 (saturated), feed ≈ 0 (no need to add).
+    //               f is like a nutrient drip keeping the system alive.
+    //
+    //   (k + f)·B — Kill/removal term. B is continuously removed at rate
+    //               (k + f). k is the decay rate of B, and the extra f term
+    //               accounts for dilution by the incoming A feed. Higher k
+    //               means B dies faster and can only survive in dense clusters.
+    //
+    // WHY PATTERNS FORM — TURING INSTABILITY
+    // ----------------------------------------
+    //
+    // The key insight from Turing's 1952 paper: if the inhibitor (A, which
+    // suppresses B by being consumed) diffuses FASTER than the activator (B),
+    // then a local perturbation of B can grow.
+    //
+    // Here's the intuition: imagine a tiny spot of extra B appears.
+    //   1. B reacts with local A, consuming it (A·B² reaction)
+    //   2. A diffuses back in from surrounding areas (Da > Db, so A is fast)
+    //   3. But B diffuses slowly, staying concentrated in the spot
+    //   4. The fresh A arriving feeds the B reaction even more
+    //   5. Meanwhile, the depleted A around the spot creates a "moat" that
+    //      prevents new B spots from forming too close
+    //
+    // This creates a self-organizing pattern: B spots separated by gaps
+    // where A is depleted. The exact pattern (spots, stripes, etc.) depends
+    // on the balance of f and k.
+    //
+    // In this model: Da = 1.0, Db = 0.5 — A diffuses twice as fast as B.
+    // This 2:1 ratio is what makes pattern formation possible.
+    //
+    // WHAT f AND k CONTROL
+    // ---------------------
+    //   f (feed rate): How fast fresh A is supplied. Higher f → more
+    //     fuel → B can grow more aggressively → denser patterns.
+    //   k (kill rate): How fast B is removed. Higher k → B struggles to
+    //     survive → sparser patterns, more gaps.
+    //
+    // Small changes in f and k produce qualitatively different patterns
+    // because the system operates near a critical boundary (a bifurcation)
+    // between "B dies out" and "B takes over." Near this boundary, the
+    // pattern type is exquisitely sensitive to the f/k ratio.
+    //
+    // THE LAPLACIAN (∇²) — WHAT IT MEASURES
+    // ---------------------------------------
+    // The Laplacian at a point measures how much the value there differs
+    // from the average of its neighbors. Geometrically:
+    //   ∇²A > 0 → this cell is a local MINIMUM (valley) → concentration
+    //              flows IN (like water filling a dip)
+    //   ∇²A < 0 → this cell is a local MAXIMUM (hill) → concentration
+    //              flows OUT (like water running off a mound)
+    //   ∇²A = 0 → this cell matches its neighbors → no net flow
+    //
+    // We approximate it with a 5-point weighted stencil:
+    //
+    //         0.05  0.2  0.05
+    //         0.2   -1   0.2
+    //         0.05  0.2  0.05
+    //
+    // Cardinal neighbors (up/down/left/right) get weight 0.2 each (= 0.8
+    // total), diagonals get 0.05 each (= 0.2 total), center gets -1.
+    // Sum of all weights = 0, which is required: a uniform field should
+    // have zero Laplacian (no net flow when everything is equal).
+
+    // -----------------------------------------------------------------------
+    // Constants
+    // -----------------------------------------------------------------------
+    const N = 256;                // grid resolution
+    const Da = 1.0;               // diffusion rate of A (the fast one)
+    const Db = 0.5;               // diffusion rate of B (the slow one — this asymmetry drives patterns)
+    const STEPS_PER_FRAME = 10;   // iterations per animation frame for smooth evolution
+    const dt = 1.0;               // time step (stable at 1.0 for these parameters)
+
+    // -----------------------------------------------------------------------
+    // Canvas setup — two-canvas approach for reliable full-viewport rendering
+    // -----------------------------------------------------------------------
+    //
+    // We use an offscreen canvas at simulation resolution (256×256) for the
+    // pixel data, then draw it scaled onto a visible full-viewport canvas.
+    // This is more reliable than CSS image scaling which behaves inconsistently
+    // across browsers.
+    // -----------------------------------------------------------------------
+    const container = document.getElementById('canvas-container');
+
+    // Visible canvas — fills the entire viewport
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'display:block;width:100%;height:100%;';
+    container.appendChild(canvas);
+    const dispCtx = canvas.getContext('2d');
+
+    // Offscreen canvas — simulation resolution, never displayed directly
+    const simCanvas = document.createElement('canvas');
+    simCanvas.width = N;
+    simCanvas.height = N;
+    const simCtx = simCanvas.getContext('2d');
+    const imageData = simCtx.createImageData(N, N);
+    const pixels = imageData.data; // Uint8ClampedArray, 4 bytes per pixel (RGBA)
+
+    let W = 0, H = 0;
+
+    function resize() {
+      W = container.clientWidth;
+      H = container.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      dispCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Nearest-neighbor scaling — keeps the pixel art look
+      dispCtx.imageSmoothingEnabled = false;
+    }
+
+    resize();
+    window.addEventListener('resize', () => { resize(); render(); });
+
+    // -----------------------------------------------------------------------
+    // Simulation buffers — ping-pong pattern
+    // -----------------------------------------------------------------------
+    //
+    // WHY PING-PONG BUFFERS?
+    // We need two copies of each concentration grid. During one time step,
+    // the update rule for cell (x,y) reads the CURRENT values of its
+    // neighbors. If we wrote the NEW value back into the same array, then
+    // when we update cell (x+1,y) next, its left neighbor would already
+    // be the new value — mixing old and new data within a single step.
+    //
+    // Solution: read from buffer 0, write to buffer 1. Next step: read
+    // from buffer 1, write to buffer 0. This "ping-pong" ensures each
+    // step uses a consistent snapshot of the previous state.
+    //
+    // Float32Array is used because concentrations are continuous values
+    // in [0, 1] and we need the precision for stable simulation.
+    // -----------------------------------------------------------------------
+
+    let A0 = new Float32Array(N * N);
+    let A1 = new Float32Array(N * N);
+    let B0 = new Float32Array(N * N);
+    let B1 = new Float32Array(N * N);
+
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    let params = {
+      f: 0.037,
+      k: 0.060,
+      palette: 'dark',
+      seedMode: 'center',
+    };
+
+    let running = true;
+    let frameId = null;
+    let stepCount = 0;
+
+    // -----------------------------------------------------------------------
+    // Initialization
+    // -----------------------------------------------------------------------
+
+    /** Reset the grid: A=1 everywhere, B=0 everywhere, then seed B */
+    function initGrid() {
+      // Fill with chemical A at full concentration, no B
+      A0.fill(1.0);
+      B0.fill(0.0);
+      stepCount = 0;
+
+      // Add slight noise to A everywhere — breaks symmetry so patterns
+      // nucleate more reliably across different f/k regimes
+      for (let i = 0; i < N * N; i++) {
+        A0[i] += (Math.random() - 0.5) * 0.01;
+      }
+
+      if (params.seedMode === 'center') {
+        // Seed a cluster of small B blobs near the center — multiple
+        // seeds with noise produce richer initial structure than one
+        // clean square
+        const cx = N / 2, cy = N / 2;
+        for (let s = 0; s < 5; s++) {
+          const sx = cx + Math.floor((Math.random() - 0.5) * 20);
+          const sy = cy + Math.floor((Math.random() - 0.5) * 20);
+          const r = 3 + Math.floor(Math.random() * 4);
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              const x = sx + dx, y = sy + dy;
+              if (x >= 0 && x < N && y >= 0 && y < N) {
+                const idx = y * N + x;
+                B0[idx] = 1.0;
+                A0[idx] = 0.5;
+              }
+            }
+          }
+        }
+      } else {
+        // Random seeds: scatter small clusters of B across the grid
+        const numSeeds = 25;
+        for (let s = 0; s < numSeeds; s++) {
+          const sx = Math.floor(Math.random() * (N - 10)) + 5;
+          const sy = Math.floor(Math.random() * (N - 10)) + 5;
+          const r = 2 + Math.floor(Math.random() * 4);
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              const x = sx + dx, y = sy + dy;
+              if (x >= 0 && x < N && y >= 0 && y < N) {
+                const idx = y * N + x;
+                B0[idx] = 1.0;
+                A0[idx] = 0.5;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Simulation step
+    // -----------------------------------------------------------------------
+
+    /**
+     * Run one iteration of the Gray-Scott model.
+     *
+     * For every cell, compute the Laplacian of A and B using the weighted
+     * stencil, then apply the reaction-diffusion equations to produce the
+     * next state in the ping-pong buffers.
+     */
+    function simulate() {
+      const f = params.f;
+      const k = params.k;
+
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const idx = y * N + x;
+
+          // Current concentrations
+          const a = A0[idx];
+          const b = B0[idx];
+
+          // --- Laplacian via weighted stencil (with toroidal wrapping) ---
+          //
+          // Toroidal wrapping: the grid wraps around at edges, so the
+          // left neighbor of column 0 is column N-1. This prevents edge
+          // artifacts and makes the simulation seamless.
+          const xL = x === 0 ? N - 1 : x - 1;
+          const xR = x === N - 1 ? 0 : x + 1;
+          const yU = y === 0 ? N - 1 : y - 1;
+          const yD = y === N - 1 ? 0 : y + 1;
+
+          // Cardinal neighbors (weight 0.2 each)
+          const lapA =
+            0.2 * (A0[y * N + xL] + A0[y * N + xR] + A0[yU * N + x] + A0[yD * N + x])
+            // Diagonal neighbors (weight 0.05 each)
+            + 0.05 * (A0[yU * N + xL] + A0[yU * N + xR] + A0[yD * N + xL] + A0[yD * N + xR])
+            // Center (weight -1)
+            - a;
+
+          const lapB =
+            0.2 * (B0[y * N + xL] + B0[y * N + xR] + B0[yU * N + x] + B0[yD * N + x])
+            + 0.05 * (B0[yU * N + xL] + B0[yU * N + xR] + B0[yD * N + xL] + B0[yD * N + xR])
+            - b;
+
+          // --- Gray-Scott update equations ---
+          const abb = a * b * b;  // the autocatalytic reaction term
+
+          A1[idx] = a + (Da * lapA - abb + f * (1.0 - a)) * dt;
+          B1[idx] = b + (Db * lapB + abb - (k + f) * b) * dt;
+        }
+      }
+
+      // Ping-pong: swap read and write buffers
+      const tmpA = A0; A0 = A1; A1 = tmpA;
+      const tmpB = B0; B0 = B1; B1 = tmpB;
+
+      stepCount++;
+    }
+
+    // -----------------------------------------------------------------------
+    // Rendering — map B concentration to color via palette
+    // -----------------------------------------------------------------------
+
+    /**
+     * Color palettes. Each maps a B concentration value (0 to 1) to an
+     * RGB triple. B=0 means no pattern (background), B=1 means fully
+     * saturated pattern.
+     */
+    const palettes = {
+      dark(b) {
+        // Black background, bright pattern emerges in cyan-white
+        const v = Math.min(b * 3, 1);
+        return [v * 60, v * 180, v * 220];
+      },
+      heat(b) {
+        // Black → red → orange → yellow → white heat map
+        const t = Math.min(b * 3, 1);
+        if (t < 0.33) {
+          const s = t / 0.33;
+          return [s * 200, 0, 0];
+        } else if (t < 0.66) {
+          const s = (t - 0.33) / 0.33;
+          return [200 + s * 55, s * 150, 0];
+        } else {
+          const s = (t - 0.66) / 0.34;
+          return [255, 150 + s * 105, s * 200];
+        }
+      },
+      blue(b) {
+        // Deep blue background → white pattern
+        const t = Math.min(b * 3, 1);
+        return [t * 220, t * 230, 80 + t * 175];
+      },
+      green(b) {
+        // Dark background → emerald green pattern
+        const t = Math.min(b * 3, 1);
+        return [t * 30, t * 200, t * 100];
+      },
+    };
+
+    /** Render the current B grid to the offscreen canvas, then scale to viewport */
+    function render() {
+      const palette = palettes[params.palette];
+
+      for (let i = 0; i < N * N; i++) {
+        const b = B0[i];
+        const [r, g, bl] = palette(b);
+        const p = i * 4;
+        pixels[p]     = r;
+        pixels[p + 1] = g;
+        pixels[p + 2] = bl;
+        pixels[p + 3] = 255;
+      }
+
+      // Draw pixel data to the small offscreen canvas
+      simCtx.putImageData(imageData, 0, 0);
+
+      // Scale the offscreen canvas to fill the entire viewport canvas
+      // imageSmoothingEnabled = false gives us crisp nearest-neighbor pixels
+      dispCtx.drawImage(simCanvas, 0, 0, W, H);
+    }
+
+    // -----------------------------------------------------------------------
+    // Animation loop
+    // -----------------------------------------------------------------------
+    function frame() {
+      for (let i = 0; i < STEPS_PER_FRAME; i++) {
+        simulate();
+      }
+      render();
+
+      const status = document.getElementById('status');
+      status.textContent = `step ${stepCount.toLocaleString()}`;
+
+      if (running) {
+        frameId = requestAnimationFrame(frame);
+      }
+    }
+
+    function start() {
+      if (!running) {
+        running = true;
+        document.getElementById('btn-pause').textContent = 'pause';
+        frameId = requestAnimationFrame(frame);
+      }
+    }
+
+    function stop() {
+      running = false;
+      document.getElementById('btn-pause').textContent = 'play';
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Click-to-seed: add a blob of B at the click location
+    // -----------------------------------------------------------------------
+    //
+    // The click coordinates are in viewport space. We map them back to
+    // the 256×256 simulation grid, then paint a circular patch of B with
+    // a soft falloff so the seed nucleates reliably and visibly.
+    // -----------------------------------------------------------------------
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      // Map viewport click position → simulation grid position
+      const cx = Math.floor((e.clientX - rect.left) / rect.width * N);
+      const cy = Math.floor((e.clientY - rect.top) / rect.height * N);
+      const r = 8; // radius in grid cells — large enough to see and survive
+
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          // Circular mask — only seed within the radius
+          if (dx * dx + dy * dy > r * r) continue;
+          // Wrap around grid edges (toroidal)
+          const x = ((cx + dx) % N + N) % N;
+          const y = ((cy + dy) % N + N) % N;
+          const idx = y * N + x;
+          B0[idx] = 1.0;
+          A0[idx] = 0.5;
+        }
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // Controls
+    // -----------------------------------------------------------------------
+    const feedInput = document.getElementById('ctrl-feed');
+    const feedDisplay = document.getElementById('val-feed');
+    feedInput.addEventListener('input', () => {
+      params.f = parseFloat(feedInput.value);
+      feedDisplay.textContent = params.f.toFixed(3);
+      const wide = feedDisplay.textContent.length >= 5;
+      feedDisplay.classList.toggle('bulge', wide);
+    });
+
+    const killInput = document.getElementById('ctrl-kill');
+    const killDisplay = document.getElementById('val-kill');
+    killInput.addEventListener('input', () => {
+      params.k = parseFloat(killInput.value);
+      killDisplay.textContent = params.k.toFixed(3);
+      const wide = killDisplay.textContent.length >= 5;
+      killDisplay.classList.toggle('bulge', wide);
+    });
+
+    document.getElementById('ctrl-palette').addEventListener('change', (e) => {
+      params.palette = e.target.value;
+      render();
+    });
+
+    document.getElementById('ctrl-seed-mode').addEventListener('change', (e) => {
+      params.seedMode = e.target.value;
+    });
+
+    // Preset buttons — apply known-good f/k combinations that produce
+    // distinct pattern types, then reset the simulation
+    document.querySelectorAll('.preset-row .btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        params.f = parseFloat(btn.dataset.f);
+        params.k = parseFloat(btn.dataset.k);
+        feedInput.value = params.f;
+        killInput.value = params.k;
+        feedDisplay.textContent = params.f.toFixed(3);
+        killDisplay.textContent = params.k.toFixed(3);
+        // Reset simulation with new parameters
+        initGrid();
+        if (!running) {
+          render();
+          start();
+        }
+      });
+    });
+
+    document.getElementById('btn-pause').addEventListener('click', () => {
+      if (running) stop(); else start();
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      initGrid();
+      if (!running) render();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      saveCanvasPNG(canvas, `reaction-diffusion-f${params.f}-k${params.k}.png`);
+    });
+
+    document.getElementById('toggle-ui').addEventListener('click', () => {
+      document.getElementById('controls').classList.toggle('hidden');
+    });
+
+    // -----------------------------------------------------------------------
+    // Go
+    // -----------------------------------------------------------------------
+    initGrid();
+    frame();
+  </script>
+</body>
+</html>

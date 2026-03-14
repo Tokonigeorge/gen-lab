@@ -361,7 +361,7 @@ export function computeBatch(size, entries, startIdx, endIdx) {
 function deduplicateEigenvalues(eigenvalues) {
   const seen = new Set();
   const result = [];
-  const precision = 1e6; // round to 6 decimal places
+  const precision = 1e4; // round to 4 decimal places — coarser to catch near-duplicates from float arithmetic
 
   for (let i = 0; i < eigenvalues.length; i++) {
     const key = `${Math.round(eigenvalues[i].re * precision)},${Math.round(eigenvalues[i].im * precision)}`;
