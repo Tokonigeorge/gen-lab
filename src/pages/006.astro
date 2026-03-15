@@ -1,0 +1,1094 @@
+---
+/**
+ * Experiment 006: Fourier Epicycles
+ *
+ * A visual demonstration of the Discrete Fourier Transform. Draw any shape,
+ * decompose it into frequency components, then reconstruct it using stacked
+ * rotating circles (epicycles). Each circle's radius = a frequency's amplitude,
+ * its rotation speed = the frequency index. The tip of the last circle traces
+ * the original shape.
+ *
+ * WHAT IS THE FOURIER TRANSFORM?
+ * ==============================
+ * Any periodic signal — a sound wave, a heartbeat, a closed curve — can be
+ * decomposed into a sum of sines and cosines at different frequencies. This
+ * is the Fourier Transform's core insight, published by Joseph Fourier in 1807.
+ *
+ * Intuitively: every complex wave is a choir of simple waves singing together.
+ * The Fourier Transform tells you who is singing (which frequencies), how loud
+ * each voice is (amplitude), and when each voice starts (phase).
+ *
+ * WHAT IS A FREQUENCY COMPONENT?
+ * ==============================
+ * Each component is defined by three numbers:
+ *   - Frequency (k): how many full rotations per cycle. k=1 goes around once,
+ *     k=5 goes around five times. Negative k means counter-clockwise.
+ *   - Amplitude (|X_k|): the SIZE of the circle — how much this frequency
+ *     contributes to the shape. Large amplitude = dominant feature.
+ *   - Phase (arg(X_k)): the STARTING ANGLE of the rotation — where on the
+ *     circle we begin at t=0. Phase determines alignment.
+ *
+ * WHAT THE COMPLEX EXPONENTIAL MEANS GEOMETRICALLY
+ * =================================================
+ * The DFT uses e^(-2πi·k·n/N). What does this mean?
+ *
+ * Euler's formula: e^(iθ) = cos(θ) + i·sin(θ)
+ *
+ * So e^(iθ) is a POINT ON THE UNIT CIRCLE at angle θ. As θ increases, the
+ * point ROTATES around the circle. e^(-2πi·k·n/N) rotates k times as n goes
+ * from 0 to N-1. It's a spinning arrow (phasor) in the complex plane.
+ *
+ * The DFT multiplies each sample point by this spinning arrow and sums up.
+ * If the signal has energy at frequency k, the products align constructively
+ * (they point the same way and add up). If not, they cancel out (pointing in
+ * all directions, summing to ~zero). This is correlation detection: "does the
+ * signal contain this frequency?"
+ *
+ * WHY SORTING BY AMPLITUDE WORKS
+ * ==============================
+ * Sorting components by amplitude (largest circle first) means we add the
+ * most important features first. With just 1-2 epicycles, you get the rough
+ * outline. Adding more refines the details. This is exactly how compression
+ * works: keep the big coefficients, discard the small ones.
+ *
+ * For smooth shapes, amplitude drops off quickly — a few circles suffice.
+ * For shapes with sharp corners (like a square wave), amplitude drops slowly
+ * and you see the GIBBS PHENOMENON: overshooting "ears" near the corners
+ * that persist no matter how many terms you add. The Gibbs overshoot is always
+ * about 9% of the jump height — a fundamental limit of Fourier approximation.
+ *
+ * WHY THIS WORKS FOR ANY SHAPE
+ * ============================
+ * The DFT doesn't care what shape you draw. It treats the (x, y) coordinates
+ * as a complex number x + iy at each sample point. Any closed curve in 2D
+ * is a periodic complex-valued signal, and the DFT decomposes it into its
+ * constituent rotations. This universality is why the Fourier Transform
+ * appears everywhere in science and engineering.
+ *
+ * REAL-WORLD USES
+ * ===============
+ * - JPEG compression: DCT (a cousin of DFT) decomposes image blocks into
+ *   frequency components; discard the tiny ones → smaller file
+ * - Audio processing: FFT identifies which notes are playing in real time
+ * - MRI machines: measure frequency-domain data directly, then inverse-FFT
+ *   to reconstruct the spatial image of your body
+ * - Signal filtering: remove specific frequencies (noise, hum) by zeroing
+ *   their Fourier coefficients
+ * - Telecommunications: OFDM (used in WiFi, 4G/5G) encodes data on many
+ *   frequency carriers simultaneously using FFT/IFFT
+ */
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>006 — Fourier Epicycles | Generative Lab</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100dvw;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      width: 280px;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.3s;
+      overflow: visible;
+    }
+
+    #controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #controls h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-row label {
+      flex-shrink: 0;
+      color: #aaa;
+      min-width: 20px;
+    }
+
+    .control-row input[type="range"] {
+      flex: 1;
+      accent-color: #6a8cff;
+    }
+
+    .control-row .value {
+      text-align: right;
+      color: #6a8cff;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      min-width: 36px;
+      padding: 4px 12px 4px 8px;
+      margin-right: -21px;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      transform: translateX(0);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .control-row .value.bulge {
+      transform: translateX(12px);
+    }
+
+    .control-row select {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: #ccc;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: rgba(255, 255, 255, 0.12); }
+    .btn.active { background: rgba(106, 140, 255, 0.25); border-color: #6a8cff; color: #6a8cff; }
+
+    #toggle-ui {
+      position: fixed;
+      top: 16px;
+      right: 312px;
+      z-index: 11;
+      background: rgba(10, 10, 15, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: #888;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #toggle-ui:hover { color: #ccc; }
+
+    #back {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11;
+      color: #555;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #back:hover { color: #aaa; }
+
+    #status {
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+    }
+
+    .separator {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      margin: 2px 0;
+    }
+
+    /* Drawing mode overlay hint */
+    #draw-hint {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      color: #555;
+      font-size: 16px;
+      pointer-events: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <a id="back" href="/">← gallery</a>
+  <button id="toggle-ui">UI</button>
+
+  <div id="canvas-container"></div>
+  <div id="draw-hint">draw a shape on the canvas</div>
+
+  <div id="controls">
+    <h2>006 — Fourier Epicycles</h2>
+
+    <div class="control-row">
+      <label>shape</label>
+      <select id="ctrl-shape">
+        <option value="figure8" selected>figure-8</option>
+        <option value="star">star</option>
+        <option value="heart">heart</option>
+        <option value="trefoil">trefoil</option>
+        <option value="square">square wave</option>
+        <option value="letterF">letter F</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label>circles</label>
+      <input type="range" id="ctrl-k" min="1" max="128" step="1" value="64" />
+      <span class="value" id="val-k">64</span>
+    </div>
+
+    <div class="control-row">
+      <label>speed</label>
+      <input type="range" id="ctrl-speed" min="0.1" max="3" step="0.1" value="1" />
+      <span class="value" id="val-speed">1.0</span>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-row">
+      <label>show</label>
+      <select id="ctrl-show">
+        <option value="all" selected>circles + arms + trace</option>
+        <option value="circles">circles only</option>
+        <option value="trace">trace only</option>
+        <option value="arms">arms + trace</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label>palette</label>
+      <select id="ctrl-palette">
+        <option value="spectrum">spectrum</option>
+        <option value="ink">ink</option>
+        <option value="warm">warm</option>
+        <option value="cold">cold</option>
+        <option value="rust">rust</option>
+        <option value="neon">neon</option>
+        <option value="ember">ember</option>
+        <option value="ice">ice</option>
+        <option value="emerald">emerald</option>
+        <option value="plasma">plasma</option>
+        <option value="ocean">ocean</option>
+        <option value="sunset">sunset</option>
+        <option value="mono">mono</option>
+        <option value="custom">custom...</option>
+      </select>
+    </div>
+
+    <div class="control-row">
+      <label>bg</label>
+      <select id="ctrl-bg">
+        <option value="dark" selected>dark</option>
+        <option value="light">light</option>
+        <option value="paper">paper</option>
+      </select>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="button-row">
+      <button class="btn" id="btn-draw">draw your own</button>
+      <button class="btn" id="btn-save">save PNG</button>
+    </div>
+
+    <div id="status">ready</div>
+  </div>
+
+  <script>
+    import { saveCanvasPNG } from '../shared/canvas.js';
+    import { rgbPalettes, makeCustomPalette, rgbToCSS, buildSwatchPicker } from '../shared/colors.js';
+
+    // -----------------------------------------------------------------------
+    // BACKGROUND DEFINITIONS
+    // -----------------------------------------------------------------------
+    const BACKGROUNDS = {
+      dark:  { fill: '#0a0a0f', circle: 'rgba(255,255,255,0.15)', arm: 'rgba(255,255,255,0.4)', text: '#666' },
+      light: { fill: '#f5f2eb', circle: 'rgba(0,0,0,0.1)',        arm: 'rgba(0,0,0,0.3)',       text: '#999' },
+      paper: { fill: '#e8dfc8', circle: 'rgba(60,50,30,0.12)',     arm: 'rgba(60,50,30,0.3)',    text: '#998877' },
+    };
+
+    // Current palette function — maps t ∈ [0,1] to [r,g,b]
+    let paletteFn = rgbPalettes.spectrum;
+
+    // -----------------------------------------------------------------------
+    // PRESET SHAPES
+    // -----------------------------------------------------------------------
+    //
+    // Each preset generates an array of {x, y} points forming a closed curve.
+    // The DFT doesn't care what shape it is — it decomposes ANY closed curve
+    // into frequency components. But some shapes are pedagogically interesting:
+    //
+    //   - figure-8: smooth, needs only a few harmonics
+    //   - star: sharp corners → slow amplitude decay → demonstrates Gibbs
+    //   - heart: asymmetric, shows phase alignment
+    //   - trefoil: three-fold symmetry → only every 3rd frequency is nonzero
+    //   - square wave: the classic Fourier example — Gibbs phenomenon visible
+    //   - letter F: complex, asymmetric — shows DFT handles arbitrary shapes
+    // -----------------------------------------------------------------------
+
+    const NUM_POINTS = 256;
+
+    function generatePreset(name) {
+      const pts = [];
+      switch (name) {
+
+        case 'figure8':
+          // Lemniscate of Bernoulli (∞ shape)
+          // Parametric: x = sin(t), y = sin(t)·cos(t) = sin(2t)/2
+          for (let i = 0; i < NUM_POINTS; i++) {
+            const t = (i / NUM_POINTS) * Math.PI * 2;
+            pts.push({ x: Math.sin(t), y: Math.sin(2 * t) / 2 });
+          }
+          break;
+
+        case 'star':
+          // Five-pointed star — alternating between inner and outer radii
+          // Sharp corners = high-frequency content = needs many epicycles
+          for (let i = 0; i < NUM_POINTS; i++) {
+            const t = (i / NUM_POINTS) * Math.PI * 2;
+            // 10 vertices total: 5 outer tips, 5 inner notches
+            const angle = t - Math.PI / 2; // start at top
+            const r = (Math.floor((i / NUM_POINTS) * 10) % 2 === 0) ? 1.0 : 0.4;
+            // Smooth the radius transition slightly for cleaner sampling
+            const vertexAngle = (i / NUM_POINTS) * 10 * Math.PI;
+            const rSmooth = 0.7 + 0.3 * Math.cos(vertexAngle);
+            pts.push({ x: rSmooth * Math.cos(angle), y: rSmooth * Math.sin(angle) });
+          }
+          break;
+
+        case 'heart':
+          // Heart curve — parametric form
+          // x = 16·sin³(t), y = 13·cos(t) - 5·cos(2t) - 2·cos(3t) - cos(4t)
+          for (let i = 0; i < NUM_POINTS; i++) {
+            const t = (i / NUM_POINTS) * Math.PI * 2;
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+            pts.push({ x: x / 17, y: y / 17 }); // normalize to ~[-1, 1]
+          }
+          break;
+
+        case 'trefoil':
+          // Trefoil knot projection — three-fold symmetric
+          // Because of 3-fold symmetry, only every 3rd Fourier coefficient is
+          // nonzero. This creates an interesting "sparse" epicycle pattern.
+          for (let i = 0; i < NUM_POINTS; i++) {
+            const t = (i / NUM_POINTS) * Math.PI * 2;
+            const r = 0.5 + 0.5 * Math.cos(3 * t);
+            pts.push({ x: r * Math.cos(t), y: r * Math.sin(t) });
+          }
+          break;
+
+        case 'square':
+          // Square wave path — a rectangle traced as a closed curve.
+          // The sharp corners are where the Gibbs phenomenon appears: the
+          // Fourier approximation overshoots by ~9% at each discontinuity,
+          // no matter how many terms you add. This 9% overshoot was proven
+          // by J. Willard Gibbs in 1899 and is a fundamental property of
+          // Fourier series at jump discontinuities.
+          for (let i = 0; i < NUM_POINTS; i++) {
+            const t = i / NUM_POINTS;
+            let x, y;
+            if (t < 0.25) {
+              // right edge, going up
+              x = 1; y = -1 + (t / 0.25) * 2;
+            } else if (t < 0.5) {
+              // top edge, going left
+              x = 1 - ((t - 0.25) / 0.25) * 2; y = 1;
+            } else if (t < 0.75) {
+              // left edge, going down
+              x = -1; y = 1 - ((t - 0.5) / 0.25) * 2;
+            } else {
+              // bottom edge, going right
+              x = -1 + ((t - 0.75) / 0.25) * 2; y = -1;
+            }
+            pts.push({ x, y });
+          }
+          break;
+
+        case 'letterF':
+          // The letter F traced as a path — complex, asymmetric shape
+          // that demonstrates the DFT handles arbitrary contours.
+          {
+            const path = [
+              // Bottom-left, trace counter-clockwise around F
+              {x:-0.3, y: 0.9},  // bottom of left stroke
+              {x:-0.3, y:-0.9},  // top-left corner
+              {x: 0.7, y:-0.9},  // top-right of top bar
+              {x: 0.7, y:-0.65}, // inner top bar
+              {x: 0.0, y:-0.65}, // inner junction top
+              {x: 0.0, y:-0.15}, // inner above middle bar
+              {x: 0.5, y:-0.15}, // right of middle bar
+              {x: 0.5, y: 0.1},  // bottom of middle bar
+              {x: 0.0, y: 0.1},  // inner below middle bar
+              {x: 0.0, y: 0.9},  // bottom of stem
+            ];
+            // Interpolate the path to NUM_POINTS evenly spaced points
+            const segments = [];
+            let totalLen = 0;
+            for (let i = 0; i < path.length; i++) {
+              const a = path[i], b = path[(i + 1) % path.length];
+              const dx = b.x - a.x, dy = b.y - a.y;
+              const len = Math.sqrt(dx * dx + dy * dy);
+              segments.push({ a, b, len });
+              totalLen += len;
+            }
+            for (let i = 0; i < NUM_POINTS; i++) {
+              let target = (i / NUM_POINTS) * totalLen;
+              let acc = 0;
+              for (const seg of segments) {
+                if (acc + seg.len >= target) {
+                  const frac = (target - acc) / seg.len;
+                  pts.push({
+                    x: seg.a.x + (seg.b.x - seg.a.x) * frac,
+                    y: seg.a.y + (seg.b.y - seg.a.y) * frac,
+                  });
+                  break;
+                }
+                acc += seg.len;
+              }
+            }
+          }
+          break;
+      }
+      return pts;
+    }
+
+    // -----------------------------------------------------------------------
+    // DISCRETE FOURIER TRANSFORM — implemented from scratch
+    // -----------------------------------------------------------------------
+    //
+    // THE DFT FORMULA:
+    //
+    //   X_k = Σ_{n=0}^{N-1}  x_n · e^{-2πi · k · n / N}
+    //
+    // What each piece means:
+    //
+    //   x_n         — the n-th sample point, treated as a complex number
+    //                  (we use x_n.x + i·x_n.y to encode 2D position)
+    //
+    //   e^{-2πi·k·n/N} — a ROTATING UNIT VECTOR. As n goes from 0 to N-1,
+    //                      this vector completes k full rotations. It's a
+    //                      "test frequency": we're asking "how much does
+    //                      the signal correlate with frequency k?"
+    //
+    //   X_k         — the k-th frequency component (complex number)
+    //                  |X_k| = amplitude = circle radius
+    //                  arg(X_k) = phase = starting angle
+    //
+    // WHY WE DON'T USE FFT:
+    // The FFT (Fast Fourier Transform) computes the same result in O(N log N)
+    // instead of O(N²). For N=256, DFT takes 65,536 multiplications vs FFT's
+    // ~2,048. Both are instantaneous for 256 points, so we use DFT for clarity.
+    // The FFT's "butterfly" decomposition is elegant but obscures the core idea.
+    //
+    // For a million-point audio signal, you'd absolutely need FFT. For 256
+    // points of a hand-drawn curve, DFT is just as fast and far easier to
+    // understand. This is the right trade: optimize for insight, not speed.
+    // -----------------------------------------------------------------------
+
+    function dft(points) {
+      const N = points.length;
+      const components = [];
+
+      for (let k = 0; k < N; k++) {
+        // X_k accumulates the sum for frequency k
+        let re = 0; // real part of X_k
+        let im = 0; // imaginary part of X_k
+
+        for (let n = 0; n < N; n++) {
+          // The angle for this sample at this frequency:
+          // φ = -2π · k · n / N
+          //
+          // This angle advances by -2πk/N per sample. Over all N samples,
+          // it completes exactly k full rotations. The negative sign is
+          // convention (analysis direction vs synthesis direction).
+          const phi = (-2 * Math.PI * k * n) / N;
+
+          // Multiply the sample (as complex number) by the test phasor:
+          // x_n · e^(iφ) = (x + iy)(cos φ + i·sin φ)
+          //              = (x·cos φ - y·sin φ) + i·(x·sin φ + y·cos φ)
+          const cos_phi = Math.cos(phi);
+          const sin_phi = Math.sin(phi);
+
+          re += points[n].x * cos_phi - points[n].y * sin_phi;
+          im += points[n].x * sin_phi + points[n].y * cos_phi;
+        }
+
+        // Normalize by N so that the inverse DFT (synthesis) reconstructs
+        // the original signal without a scale factor
+        re /= N;
+        im /= N;
+
+        // Convert to polar form for drawing:
+        //   amplitude = |X_k| = radius of the k-th epicycle
+        //   phase = arg(X_k) = starting angle of the k-th arm
+        const amplitude = Math.sqrt(re * re + im * im);
+        const phase = Math.atan2(im, re);
+
+        components.push({
+          freq: k,          // frequency index
+          amplitude,        // circle radius
+          phase,            // starting angle
+          re,               // keep Cartesian form for reconstruction
+          im,
+        });
+      }
+
+      // SORT BY AMPLITUDE DESCENDING
+      //
+      // Why? Largest circles contribute most to the shape. By drawing them
+      // first (outermost), the K slider smoothly adds detail: K=1 gives the
+      // dominant motion, K=5 gives a rough outline, K=N gives the exact shape.
+      //
+      // This ordering also mirrors how compression works: JPEG keeps the
+      // largest DCT coefficients and discards the small ones. Our K slider
+      // is literally a compression quality knob.
+      components.sort((a, b) => b.amplitude - a.amplitude);
+
+      return components;
+    }
+
+    // -----------------------------------------------------------------------
+    // INVERSE DFT — reconstruct the point at time t using K epicycles
+    // -----------------------------------------------------------------------
+    //
+    // The synthesis formula (inverse DFT) is:
+    //
+    //   x(t) = Σ_{k} X_k · e^{2πi · freq_k · t}
+    //
+    // Geometrically: each term is a ROTATING ARM. The amplitude |X_k| is the
+    // arm length (circle radius), freq_k is how fast it spins, and the phase
+    // arg(X_k) is its starting orientation. Stack all the arms tip-to-tail,
+    // and the tip of the last one traces the original curve.
+    //
+    // This is the epicycle model from ancient astronomy — Ptolemy approximated
+    // planetary orbits by stacking circles (epicycles). The DFT proves this
+    // approach can represent ANY periodic curve, not just orbits.
+    // -----------------------------------------------------------------------
+
+    function epicycleAt(components, t, K) {
+      let x = 0, y = 0;
+      const arms = []; // for drawing the circles and arms
+
+      const count = Math.min(K, components.length);
+
+      for (let i = 0; i < count; i++) {
+        const c = components[i];
+
+        // The angle of this arm at time t:
+        //   θ = 2π · freq · t + phase
+        //
+        // freq rotations per full cycle, phase offsets the start
+        const angle = 2 * Math.PI * c.freq * t + c.phase;
+
+        // Previous tip position (center of this circle)
+        const prevX = x, prevY = y;
+
+        // Add this arm's contribution
+        x += c.amplitude * Math.cos(angle);
+        y += c.amplitude * Math.sin(angle);
+
+        arms.push({
+          cx: prevX, cy: prevY,       // circle center
+          radius: c.amplitude,         // circle radius
+          tipX: x, tipY: y,            // arm tip
+        });
+      }
+
+      return { x, y, arms };
+    }
+
+    // -----------------------------------------------------------------------
+    // Canvas setup
+    // -----------------------------------------------------------------------
+    const container = document.getElementById('canvas-container');
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'display:block;width:100%;height:100%;';
+    container.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    let W = 0, H = 0;
+
+    function resize() {
+      W = container.clientWidth;
+      H = container.clientHeight;
+      canvas.width = W;
+      canvas.height = H;
+    }
+
+    resize();
+
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    let components = [];         // DFT output (sorted by amplitude)
+    let tracePoints = [];        // the traced path so far
+    let time = 0;                // current time [0, 1) — one full period
+    let animId = null;
+    let drawingMode = false;     // are we in freehand draw mode?
+    let drawnPoints = [];        // raw mouse/touch points during drawing
+    let isDrawing = false;       // mouse/touch currently down?
+
+    // -----------------------------------------------------------------------
+    // Coordinate transform — map [-1.2, 1.2] shape space to canvas pixels
+    // -----------------------------------------------------------------------
+    function shapeToCanvas(sx, sy) {
+      const scale = Math.min(W, H) * 0.35;
+      return {
+        x: W / 2 + sx * scale,
+        y: H / 2 + sy * scale,
+      };
+    }
+
+    function canvasToShape(cx, cy) {
+      const scale = Math.min(W, H) * 0.35;
+      return {
+        x: (cx - W / 2) / scale,
+        y: (cy - H / 2) / scale,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Main render loop
+    // -----------------------------------------------------------------------
+
+    function cancelAnim() {
+      if (animId !== null) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    }
+
+    function startAnimation() {
+      cancelAnim();
+      time = 0;
+      tracePoints = [];
+
+      const speed = parseFloat(document.getElementById('ctrl-speed').value);
+      const status = document.getElementById('status');
+      const kSlider = document.getElementById('ctrl-k');
+      const kVal = document.getElementById('val-k');
+
+      // Update K slider max to match component count
+      kSlider.max = components.length;
+      if (parseInt(kSlider.value) > components.length) {
+        kSlider.value = components.length;
+        kVal.textContent = components.length;
+      }
+
+      const startTime = performance.now();
+
+      function frame(now) {
+        const K = parseInt(kSlider.value);
+        const bg = document.getElementById('ctrl-bg').value;
+        const showMode = document.getElementById('ctrl-show').value;
+        const bgDef = BACKGROUNDS[bg];
+
+        // Advance time — one full period = 2π, we map t ∈ [0, 1)
+        const elapsed = (now - startTime) / 1000;
+        time = (elapsed * speed / 4) % 1; // ~4 seconds per cycle at speed=1
+
+        // Compute current epicycle state
+        const result = epicycleAt(components, time, K);
+
+        // Store trace point (canvas coordinates)
+        const tip = shapeToCanvas(result.x, result.y);
+        tracePoints.push({ x: tip.x, y: tip.y });
+
+        // Limit trace to ~2 full cycles worth of points to keep memory bounded
+        const maxTrace = 3000;
+        if (tracePoints.length > maxTrace) {
+          tracePoints = tracePoints.slice(tracePoints.length - maxTrace);
+        }
+
+        // --- Draw ---
+        ctx.fillStyle = bgDef.fill;
+        ctx.fillRect(0, 0, W, H);
+
+        const showCircles = showMode === 'all' || showMode === 'circles';
+        const showArms = showMode === 'all' || showMode === 'arms';
+        const showTrace = showMode !== 'circles';
+
+        // Draw epicycle circles and arms
+        if (showCircles || showArms) {
+          for (const arm of result.arms) {
+            const center = shapeToCanvas(arm.cx, arm.cy);
+            const tipPos = shapeToCanvas(arm.tipX, arm.tipY);
+            const radiusPx = arm.radius * Math.min(W, H) * 0.35;
+
+            // Skip tiny circles (below 0.5px radius) for clarity
+            if (radiusPx < 0.5) continue;
+
+            if (showCircles) {
+              // Draw the circle
+              ctx.strokeStyle = bgDef.circle;
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+
+            if (showArms) {
+              // Draw the arm (line from center to tip)
+              ctx.strokeStyle = bgDef.arm;
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(center.x, center.y);
+              ctx.lineTo(tipPos.x, tipPos.y);
+              ctx.stroke();
+
+              // Small dot at tip
+              ctx.fillStyle = bgDef.arm;
+              ctx.beginPath();
+              ctx.arc(tipPos.x, tipPos.y, 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+
+        // Draw the trace path — color each segment using the palette
+        if (showTrace && tracePoints.length > 1) {
+          ctx.lineWidth = 2;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          const len = tracePoints.length;
+          for (let i = 1; i < len; i++) {
+            const t = i / (len - 1); // 0→1 along the trace
+            ctx.strokeStyle = rgbToCSS(paletteFn(t));
+            ctx.beginPath();
+            ctx.moveTo(tracePoints[i - 1].x, tracePoints[i - 1].y);
+            ctx.lineTo(tracePoints[i].x, tracePoints[i].y);
+            ctx.stroke();
+          }
+        }
+
+        // Draw a bright dot at the current tip
+        ctx.fillStyle = rgbToCSS(paletteFn(1));
+        ctx.beginPath();
+        ctx.arc(tip.x, tip.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        status.textContent = `${K} / ${components.length} epicycles · t = ${time.toFixed(3)}`;
+
+        animId = requestAnimationFrame(frame);
+      }
+
+      animId = requestAnimationFrame(frame);
+    }
+
+    // -----------------------------------------------------------------------
+    // Load a preset shape and start animating
+    // -----------------------------------------------------------------------
+    function loadShape(points) {
+      components = dft(points);
+      tracePoints = [];
+      time = 0;
+
+      // Update K slider
+      const kSlider = document.getElementById('ctrl-k');
+      kSlider.max = components.length;
+      // Default K to all components (or keep current if within range)
+      const currentK = parseInt(kSlider.value);
+      if (currentK > components.length) {
+        kSlider.value = components.length;
+        document.getElementById('val-k').textContent = components.length;
+      }
+
+      startAnimation();
+    }
+
+    function loadPreset(name) {
+      const pts = generatePreset(name);
+      loadShape(pts);
+    }
+
+    // -----------------------------------------------------------------------
+    // Drawing mode — freehand input
+    // -----------------------------------------------------------------------
+    //
+    // The user draws a closed curve with the mouse/touch. We sample the path
+    // at regular intervals to get ~256 evenly-spaced points, then feed them
+    // to the DFT. The DFT doesn't care how the points were generated — it
+    // decomposes any closed curve into frequency components.
+    // -----------------------------------------------------------------------
+
+    function enterDrawMode() {
+      cancelAnim();
+      drawingMode = true;
+      drawnPoints = [];
+      isDrawing = false;
+
+      const bg = document.getElementById('ctrl-bg').value;
+      const bgDef = BACKGROUNDS[bg];
+      ctx.fillStyle = bgDef.fill;
+      ctx.fillRect(0, 0, W, H);
+
+      canvas.style.cursor = 'crosshair';
+      document.getElementById('draw-hint').style.display = '';
+      document.getElementById('btn-draw').classList.add('active');
+      document.getElementById('status').textContent = 'draw a closed shape…';
+    }
+
+    function exitDrawMode() {
+      drawingMode = false;
+      canvas.style.cursor = '';
+      document.getElementById('draw-hint').style.display = 'none';
+      document.getElementById('btn-draw').classList.remove('active');
+    }
+
+    function resamplePath(rawPoints, targetCount) {
+      // Compute cumulative arc length
+      const cumLen = [0];
+      for (let i = 1; i < rawPoints.length; i++) {
+        const dx = rawPoints[i].x - rawPoints[i-1].x;
+        const dy = rawPoints[i].y - rawPoints[i-1].y;
+        cumLen.push(cumLen[i-1] + Math.sqrt(dx*dx + dy*dy));
+      }
+      const totalLen = cumLen[cumLen.length - 1];
+      if (totalLen < 1) return rawPoints.slice(0, targetCount);
+
+      // Sample at even intervals along the arc
+      const result = [];
+      for (let i = 0; i < targetCount; i++) {
+        const target = (i / targetCount) * totalLen;
+        // Find the segment containing this arc-length position
+        let lo = 0, hi = cumLen.length - 1;
+        while (lo < hi - 1) {
+          const mid = (lo + hi) >> 1;
+          if (cumLen[mid] <= target) lo = mid; else hi = mid;
+        }
+        const segFrac = (target - cumLen[lo]) / (cumLen[hi] - cumLen[lo] || 1);
+        result.push({
+          x: rawPoints[lo].x + (rawPoints[hi].x - rawPoints[lo].x) * segFrac,
+          y: rawPoints[lo].y + (rawPoints[hi].y - rawPoints[lo].y) * segFrac,
+        });
+      }
+      return result;
+    }
+
+    function finishDrawing() {
+      if (drawnPoints.length < 10) {
+        exitDrawMode();
+        loadPreset(document.getElementById('ctrl-shape').value);
+        return;
+      }
+
+      // Resample to NUM_POINTS evenly-spaced points in shape coordinates
+      const resampled = resamplePath(drawnPoints, NUM_POINTS);
+      // Convert from canvas to shape coordinates
+      const shapePts = resampled.map(p => canvasToShape(p.x, p.y));
+
+      exitDrawMode();
+      loadShape(shapePts);
+    }
+
+    // Mouse/touch handlers for drawing
+    canvas.addEventListener('mousedown', (e) => {
+      if (!drawingMode) return;
+      isDrawing = true;
+      drawnPoints = [{ x: e.offsetX, y: e.offsetY }];
+      document.getElementById('draw-hint').style.display = 'none';
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!drawingMode || !isDrawing) return;
+      drawnPoints.push({ x: e.offsetX, y: e.offsetY });
+
+      // Draw the stroke in real time using the active palette
+      if (drawnPoints.length > 1) {
+        const a = drawnPoints[drawnPoints.length - 2];
+        const b = drawnPoints[drawnPoints.length - 1];
+        ctx.strokeStyle = rgbToCSS(paletteFn(0.6));
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      if (!drawingMode || !isDrawing) return;
+      isDrawing = false;
+      finishDrawing();
+    });
+
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+      if (!drawingMode) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      isDrawing = true;
+      drawnPoints = [{ x: touch.clientX - rect.left, y: touch.clientY - rect.top }];
+      document.getElementById('draw-hint').style.display = 'none';
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!drawingMode || !isDrawing) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const pt = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+      drawnPoints.push(pt);
+
+      if (drawnPoints.length > 1) {
+        const a = drawnPoints[drawnPoints.length - 2];
+        ctx.strokeStyle = rgbToCSS(paletteFn(0.6));
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(pt.x, pt.y);
+        ctx.stroke();
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+      if (!drawingMode || !isDrawing) return;
+      isDrawing = false;
+      finishDrawing();
+    });
+
+    // -----------------------------------------------------------------------
+    // Controls wiring
+    // -----------------------------------------------------------------------
+
+    document.getElementById('ctrl-shape').addEventListener('change', (e) => {
+      exitDrawMode();
+      loadPreset(e.target.value);
+    });
+
+    const kSlider = document.getElementById('ctrl-k');
+    const kVal = document.getElementById('val-k');
+    kSlider.addEventListener('input', () => {
+      kVal.textContent = kSlider.value;
+      const wide = kSlider.value.length >= 3;
+      kVal.classList.toggle('bulge', wide);
+      // Clear trace when K changes so the new approximation draws fresh
+      tracePoints = [];
+    });
+
+    const speedSlider = document.getElementById('ctrl-speed');
+    const speedVal = document.getElementById('val-speed');
+    speedSlider.addEventListener('input', () => {
+      speedVal.textContent = parseFloat(speedSlider.value).toFixed(1);
+    });
+
+    document.getElementById('ctrl-bg').addEventListener('change', () => {
+      // Just let the next frame pick up the new background
+      tracePoints = [];
+    });
+
+    const paletteSelect = document.getElementById('ctrl-palette');
+    const swatchPicker = buildSwatchPicker(paletteSelect, (hex) => {
+      paletteFn = makeCustomPalette(hex);
+      tracePoints = [];
+    });
+
+    paletteSelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'custom') {
+        swatchPicker.show();
+      } else {
+        swatchPicker.hide();
+        paletteFn = rgbPalettes[val];
+        tracePoints = [];
+      }
+    });
+
+    document.getElementById('ctrl-show').addEventListener('change', () => {
+      // Next frame picks up new display mode
+    });
+
+    document.getElementById('btn-draw').addEventListener('click', () => {
+      if (drawingMode) {
+        exitDrawMode();
+        loadPreset(document.getElementById('ctrl-shape').value);
+      } else {
+        enterDrawMode();
+      }
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      saveCanvasPNG(canvas, 'fourier-epicycles.png');
+    });
+
+    document.getElementById('toggle-ui').addEventListener('click', () => {
+      document.getElementById('controls').classList.toggle('hidden');
+    });
+
+    window.addEventListener('resize', () => {
+      resize();
+      tracePoints = [];
+    });
+
+    // -----------------------------------------------------------------------
+    // Boot — load default preset
+    // -----------------------------------------------------------------------
+    function boot() {
+      resize();
+      if (W > 0 && H > 0) {
+        loadPreset('figure8');
+      } else {
+        requestAnimationFrame(boot);
+      }
+    }
+    requestAnimationFrame(boot);
+  </script>
+</body>
+</html>

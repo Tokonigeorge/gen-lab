@@ -1043,6 +1043,105 @@ At 90°: + turns 90° left, -- turns 180° right
     </details>
 
     <!-- ============================================================ -->
+    <!-- EXPERIMENT 006: FOURIER EPICYCLES -->
+    <!-- ============================================================ -->
+    <h2 style="font-size: 14px; color: #6a8cff; letter-spacing: 0.06em; text-transform: uppercase; margin: 32px 0 16px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06);">Experiment 006: Fourier Epicycles</h2>
+
+    <details open>
+      <summary><span class="num">25</span> The Fourier Transform — Decomposing Signals Into Frequencies</summary>
+      <div class="section-body">
+        <p>Any periodic signal — a sound wave, a heartbeat, a closed curve — can be decomposed into a sum of sines and cosines at different frequencies. This is Joseph Fourier's 1807 insight: every complex waveform is a choir of simple waves singing together.</p>
+        <p>The <strong>Discrete Fourier Transform</strong> takes N sample points and produces N frequency components:</p>
+        <pre>X_k = (1/N) · Σ x_n · e^(-2πi · k · n / N)     for n = 0 to N-1
+
+Where:
+  x_n      — the n-th sample (complex: x + iy for 2D points)
+  X_k      — the k-th frequency component
+  |X_k|    — amplitude (circle radius)
+  arg(X_k) — phase (starting angle)</pre>
+        <p>For our 2D shapes, each point (x, y) is treated as a complex number x + iy. The DFT decomposes the curve into its constituent rotations.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> A prism splits white light into its constituent colors (frequencies). The Fourier Transform is a mathematical prism: it splits any signal into its constituent pure tones (sines/cosines), revealing what frequencies are present and how strong each is.
+        </div>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Load the "figure-8" preset and set circles to 3. Notice how just 3 epicycles capture the basic figure-8 shape. Now try the "square wave" preset with 3 circles — it's much rougher, because sharp corners need many more frequencies to represent.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">26</span> The Complex Exponential — Rotation in the Complex Plane</summary>
+      <div class="section-body">
+        <p>The DFT's core operation is multiplication by e<sup>-2πi·k·n/N</sup>. Euler's formula reveals what this means geometrically:</p>
+        <pre>Euler's formula:  e^(iθ) = cos(θ) + i·sin(θ)</pre>
+        <p>This is a <strong>point on the unit circle</strong> at angle θ. As θ increases, the point rotates. So e<sup>-2πi·k·n/N</sup> is a unit vector that completes k full rotations as n goes from 0 to N-1.</p>
+        <pre>e^(i·0)     = 1   → points right  (3 o'clock)
+e^(i·π/2)   = i   → points up     (12 o'clock)
+e^(i·π)     = -1  → points left   (9 o'clock)
+e^(i·3π/2)  = -i  → points down   (6 o'clock)
+e^(i·2π)    = 1   → back to start (one full rotation)</pre>
+        <p>The DFT multiplies each sample by this spinning arrow and sums. If the signal has energy at frequency k, the products <strong>align constructively</strong> (they point the same way and add up to a large number). If not, they point in all directions and cancel to ~zero.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> Imagine spinning a jump rope at frequency k while someone else waves the rope at their own frequency. If both frequencies match, the rope's motion builds up (resonance). If they don't match, the waves cancel out. The DFT tests every possible frequency by "spinning" at that rate and seeing how much signal resonates.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">27</span> Epicycles — From Ptolemy to Fourier</summary>
+      <div class="section-body">
+        <p>In the 2nd century, Ptolemy modeled planetary orbits by stacking rotating circles — deferent + epicycle + epicycle. This was dismissed when Kepler found elliptical orbits, but the <em>mathematics</em> is sound: stacked rotating circles CAN approximate any closed curve.</p>
+        <p>The inverse DFT reconstructs the shape:</p>
+        <pre>x(t) = Σ_k  X_k · e^(2πi · freq_k · t)</pre>
+        <p>Each term is a <strong>rotating arm</strong>: |X_k| is the arm length (circle radius), freq_k is how fast it spins, and the phase is its starting orientation. Stack all arms tip-to-tail, and the tip traces the original curve.</p>
+        <p>Sorting by amplitude (largest first) means adding epicycles progressively improves the approximation:</p>
+        <pre>K = 1:   dominant motion (one big circle)
+K = 5:   rough outline
+K = 20:  recognizable shape
+K = N:   exact reconstruction</pre>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Load any preset and slowly drag the "circles" slider from 1 to the maximum. Watch the shape emerge from a single circle to the full curve. This is literally how compression works: keep the big coefficients, discard the small ones.
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="num">28</span> Gibbs Phenomenon and Compression</summary>
+      <div class="section-body">
+        <p>For smooth shapes (figure-8, heart), amplitudes decay rapidly — few epicycles suffice. But shapes with <strong>sharp corners</strong> (square, letter F) have slowly-decaying amplitudes.</p>
+        <p>At jump discontinuities, the Fourier approximation <strong>overshoots by ~9%</strong> — the <strong>Gibbs phenomenon</strong>. J. Willard Gibbs proved in 1899 that this overshoot persists no matter how many terms you add. It's a fundamental limit of Fourier approximation at discontinuities.</p>
+        <pre>Square wave with K epicycles:
+
+K = 1:    ∿            (rough sine)
+K = 5:    ⌈⌉ + ripples (starting to square up)
+K = 50:   ⌈⌉ + ears    (very square, but 9% overshoot at corners)
+K = ∞:    ⌈⌉ exact     (perfect everywhere except at the exact corners)</pre>
+        <p>This connects directly to <strong>JPEG compression</strong>: JPEG uses DCT (a cosine variant of DFT) on 8×8 image blocks. Keeping only the largest coefficients = keeping the big epicycles. The ringing artifacts near sharp edges in JPEG images? That's the Gibbs phenomenon.</p>
+
+        <div class="analogy">
+          <strong>Analogy:</strong> Try to draw a perfect square using only circles. Your first few circles get the rough shape, but the corners keep rounding off. To get sharper corners you need tinier and tinier circles — and even with infinitely many, the corners overshoot by 9%. Sharp features are "expensive" in frequency space.
+        </div>
+
+        <h3>Real-world applications of the Fourier Transform</h3>
+        <ul>
+          <li><strong>JPEG/MPEG</strong> — image and video compression via DCT</li>
+          <li><strong>Audio processing</strong> — FFT identifies notes, filters noise, enables equalizers</li>
+          <li><strong>MRI machines</strong> — measure frequency-domain data, then inverse-FFT to get spatial images</li>
+          <li><strong>WiFi / 5G</strong> — OFDM encodes data on many frequency carriers using FFT/IFFT</li>
+          <li><strong>Spectroscopy</strong> — identifying chemical compounds by their frequency signatures</li>
+        </ul>
+
+        <div class="try-it">
+          <strong>Try it:</strong> Load the "square wave" preset and slowly increase the circles slider. Watch the Gibbs overshoot "ears" at the corners — they get narrower but never smaller than ~9% of the edge height. Then switch to "figure-8" — smooth shape, no Gibbs, fast convergence.
+        </div>
+      </div>
+    </details>
+
+    <!-- ============================================================ -->
     <!-- GLOSSARY -->
     <!-- ============================================================ -->
     <details>
@@ -1085,6 +1184,13 @@ At 90°: + turns 90° left, -- turns 180° right
           <tr><td><strong>Stack (branching)</strong></td><td>[ pushes state, ] pops — enables tree-like branching by saving/restoring position</td></tr>
           <tr><td><strong>Self-similarity</strong></td><td>A structure that looks the same at different scales — the hallmark of fractals</td></tr>
           <tr><td><strong>Koch curve</strong></td><td>Classic L-system fractal with dimension ≈ 1.26 — infinitely long, zero area</td></tr>
+          <tr><td><strong>Fourier Transform</strong></td><td>Decomposes any periodic signal into constituent sines/cosines at different frequencies</td></tr>
+          <tr><td><strong>DFT</strong></td><td>Discrete Fourier Transform — Fourier Transform for sampled data, O(N²) but crystal clear</td></tr>
+          <tr><td><strong>Frequency component</strong></td><td>One sinusoidal building block: frequency (how fast), amplitude (how big), phase (starting angle)</td></tr>
+          <tr><td><strong>Epicycle</strong></td><td>A rotating circle; stacking them tip-to-tail reconstructs any closed curve</td></tr>
+          <tr><td><strong>Complex exponential</strong></td><td>e^(iθ) = cos θ + i·sin θ — represents rotation in the complex plane</td></tr>
+          <tr><td><strong>Gibbs phenomenon</strong></td><td>~9% overshoot at sharp corners in Fourier approximations — a fundamental limit</td></tr>
+          <tr><td><strong>DCT</strong></td><td>Discrete Cosine Transform — JPEG's variant of DFT for image compression</td></tr>
         </table>
       </div>
     </details>
@@ -1112,6 +1218,9 @@ At 90°: + turns 90° left, -- turns 180° right
           <li><a href="https://en.wikipedia.org/wiki/Clifford_A._Pickover">Clifford Pickover</a> — originator of the Clifford attractor family</li>
           <li><a href="http://algorithmicbotany.org/papers/abop/abop.pdf">Prusinkiewicz & Lindenmayer, <em>The Algorithmic Beauty of Plants</em></a> — the definitive L-system reference (free PDF)</li>
           <li><a href="https://en.wikipedia.org/wiki/The_Fractal_Geometry_of_Nature">Benoit Mandelbrot, <em>The Fractal Geometry of Nature</em></a> — the book that launched fractal geometry</li>
+          <li><a href="https://www.youtube.com/watch?v=spUNpyF58BY">3Blue1Brown, "But what is the Fourier Transform?"</a> — the best visual introduction to Fourier</li>
+          <li><a href="https://www.jezzamon.com/fourier/">Jez Swanson, "An Interactive Introduction to Fourier Transforms"</a> — interactive epicycle demo</li>
+          <li><a href="https://www.dspguide.com/">Steven W. Smith, <em>The Scientist and Engineer's Guide to DSP</em></a> — comprehensive free DSP textbook</li>
         </ul>
       </div>
     </details>
